@@ -1,0 +1,67 @@
+Volcano,Seismic,Infrasound,Seismic Hz,Infrasound Hz
+Akutan,✓,✓,"100.0, 50.0",50.0
+Aniakchak,✓,✓,"100.0, 50.0",50.0
+Atka volcanic complex,✓,✓,"100.0, 50.0",50.0
+Augustine,✓,✓,"100.0, 50.0, 40.0","50.0, 40.0, 20.0"
+Cleveland,✓,✓,50.0,50.0
+Dutton,✓,✓,"100.0, 50.0",50.0
+Edgecumbe,✓,✗,50.0,-
+Fisher,✓,✓,"100.0, 50.0",50.0
+Gareloi,✓,✓,"100.0, 50.0",50.0
+Great Sitkin,✓,✓,"100.0, 50.0",50.0
+Griggs,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Iliamna,✓,✓,"100.0, 50.0, 40.0, 20.0","50.0, 40.0, 20.0"
+Isanotski,✓,✓,"100.0, 50.0",50.0
+Kanaga,✓,✓,"100.0, 50.0",50.0
+Katmai,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Korovin,✓,✓,"100.0, 50.0",50.0
+Little Sitkin,✓,✓,50.0,50.0
+Mageik,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Makushin,✓,✓,"100.0, 50.0",50.0
+Martin,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Novarupta,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Okmok,✓,✓,"100.0, 50.0",50.0
+Pavlof,✓,✓,"100.0, 50.0, 40.0","50.0, 40.0, 20.0"
+Redoubt,✓,✓,"100.0, 50.0",50.0
+Semisopochnoi,✓,✓,50.0,50.0
+Shishaldin,✓,✓,"100.0, 50.0",50.0
+Snowy Mountain,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Spurr,✓,✓,"100.0, 50.0, 40.0","50.0, 40.0, 20.0"
+Takawangha,✓,✓,"100.0, 50.0",50.0
+Tanaga,✓,✓,"100.0, 50.0",50.0
+Trident,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Ugashik-Peulik,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Ukinrek Maars,✓,✓,"100.0, 50.0, 40.0","40.0, 20.0"
+Veniaminof,✓,✓,"100.0, 50.0, 40.0","50.0, 40.0, 20.0"
+Westdahl,✓,✓,"100.0, 50.0",50.0
+Wrangell,✓,✗,"100.0, 50.0",-
+Clear Lake Volcanic Field,✗,✗,-,-
+Coso Volcanic Field,✗,✗,-,-
+Lassen Volcanic Center,✗,✗,-,-
+Long Valley Caldera,✗,✗,-,-
+Mammoth Mountain,✗,✗,-,-
+Medicine Lake volcano,✗,✗,-,-
+Mono Lake Volcanic Field,✗,✗,-,-
+Mono-Inyo Craters,✗,✗,-,-
+Mount Shasta,✗,✗,-,-
+Salton Buttes,✗,✗,-,-
+Ubehebe Craters,✗,✗,-,-
+Crater Lake,✓,✗,"100.0, 50.0",-
+Glacier Peak,✗,✗,-,-
+Mount Adams,✓,✓,"100.0, 50.0",50.0
+Mount Baker,✗,✗,-,-
+Mount Hood,✓,✓,"100.0, 50.0",50.0
+Mount Jefferson,✓,✗,50.0,-
+Mount Rainier,✓,✓,"100.0, 50.0",50.0
+Mount St. Helens,✓,✓,"100.0, 99.92, 50.0",50.0
+Newberry,✓,✓,"100.0, 50.0",50.0
+Three Sisters,✓,✗,"100.0, 50.0",-
+Haleakala,✗,✗,-,-
+Hualalai,✓,✗,100.0,-
+Kilauea,✓,✓,"100.0, 50.0",40.0
+Mauna Kea,✓,✓,100.0,40.0
+Mauna Loa,✓,✓,100.0,40.0
+Ofu-Olosega,✓,✗,100.0,-
+Ta'u Island,✓,✗,100.0,-
+Tutuila Island,✓,✗,100.0,-
+Yellowstone,✗,✗,-,-
