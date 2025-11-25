@@ -2983,69 +2983,6 @@ export async function submitAwesfSurvey() {
 }
 
 /**
- * Check if session is complete and submit all responses to Qualtrics if ready
- * @param {string} participantId - The participant ID
- */
-async function checkAndSubmitIfComplete(participantId) {
-    if (!participantId) return;
-    
-    try {
-        // Check if session is complete
-        if (isSessionComplete(participantId)) {
-            const combinedResponses = getResponsesForSubmission(participantId);
-            
-            if (combinedResponses) {
-                const statusEl = document.getElementById('status');
-                statusEl.className = 'status info';
-                statusEl.textContent = '📤 All surveys complete! Submitting to Qualtrics...';
-                
-                console.log('📤 Submitting combined responses to Qualtrics:', combinedResponses);
-                
-                const submissionResult = await submitCombinedSurveyResponse(combinedResponses, participantId);
-                
-                // Extract Qualtrics Response ID
-                let qualtricsResponseId = null;
-                if (submissionResult && submissionResult.result && submissionResult.result.responseId) {
-                    qualtricsResponseId = submissionResult.result.responseId;
-                    console.log('📋 Qualtrics Response ID:', qualtricsResponseId);
-                }
-                
-                // Upload submission data to R2 (backup)
-                try {
-                    const { uploadSubmissionData } = await import('./data-uploader.js');
-                    await uploadSubmissionData(participantId, jsonDump);
-                } catch (error) {
-                    console.warn('⚠️ Could not upload submission to R2:', error);
-                }
-                
-                // Mark session as submitted with Qualtrics response ID
-                markSessionAsSubmitted(participantId, qualtricsResponseId);
-                
-                // Export response metadata to JSON file
-                if (qualtricsResponseId) {
-                    exportResponseMetadata(participantId, qualtricsResponseId, submissionResult);
-                }
-                
-                statusEl.className = 'status success';
-                let successMsg = '✅ All surveys submitted successfully to Qualtrics!';
-                if (qualtricsResponseId) {
-                    successMsg += ` Response ID: ${qualtricsResponseId}`;
-                }
-                statusEl.textContent = successMsg;
-                
-                console.log('✅ Session completed and submitted successfully');
-            }
-        }
-    } catch (error) {
-        console.error('Error checking/submitting session:', error);
-        const statusEl = document.getElementById('status');
-        statusEl.className = 'status error';
-        statusEl.textContent = `❌ Error submitting to Qualtrics: ${error.message}`;
-        throw error;
-    }
-}
-
-/**
  * Format regions and features for backend submission
  * Prepares data with all time fields in UTC ISO format
  * @param {Array} regions - Array of region objects from region-tracker
@@ -3542,6 +3479,17 @@ export async function attemptSubmission(fromWorkflow = false) {
             } else {
                 console.warn('   ⚠️ No responseId found in submission result');
                 console.log('   Full result:', submissionResult);
+            }
+            
+            // Upload submission data to R2 (backup)
+            console.log('\n📋 STEP 7.5: Uploading submission data to R2 (backup)...');
+            try {
+                const { uploadSubmissionData } = await import('./data-uploader.js');
+                const uploadResult = await uploadSubmissionData(participantId, jsonDump);
+                console.log('   ✅ R2 upload successful:', uploadResult);
+            } catch (error) {
+                console.warn('   ⚠️ Could not upload submission to R2 (non-critical):', error);
+                console.warn('   Note: Data was successfully submitted to Qualtrics - R2 is backup only');
             }
             
             // Step 8: Mark session as submitted with Qualtrics response ID
