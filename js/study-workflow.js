@@ -462,8 +462,7 @@ export function closeSession(completedAllSurveys = false, submittedToQualtrics =
             duration: `${(duration / 1000 / 60).toFixed(1)} minutes`,
             completedAllSurveys,
             submittedToQualtrics,
-            weeklyCount,
-            totalCount
+            weeklyCount
         });
         
         return sessionRecord;
