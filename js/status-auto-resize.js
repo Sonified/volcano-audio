@@ -3,12 +3,34 @@
  * Automatically shrinks status text font size when it overflows
  */
 
+// Flag to temporarily disable auto-resize (e.g., during data fetch)
+let autoResizeEnabled = true;
+
+/**
+ * Enable auto-resize
+ */
+export function enableAutoResize() {
+    autoResizeEnabled = true;
+}
+
+/**
+ * Disable auto-resize (e.g., during data fetch)
+ */
+export function disableAutoResize() {
+    autoResizeEnabled = false;
+    // Reset to default font size when disabled
+    const statusEl = document.getElementById('status');
+    if (statusEl) {
+        statusEl.style.fontSize = '16px';
+    }
+}
+
 /**
  * Check if text is overflowing and shrink font size if needed
  * @param {HTMLElement} element - The status element to check
  */
 export function autoResizeStatusText(element) {
-    if (!element) return;
+    if (!element || !autoResizeEnabled) return;
     
     // Reset to max font size to start
     let fontSize = 16;

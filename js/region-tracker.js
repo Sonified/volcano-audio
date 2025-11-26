@@ -23,7 +23,7 @@ import { initButtonsRenderer } from './waveform-buttons-renderer.js';
 import { addFeatureBox, removeFeatureBox, updateAllFeatureBoxPositions, renumberFeatureBoxes } from './spectrogram-feature-boxes.js';
 import { cancelSpectrogramSelection, redrawAllCanvasFeatureBoxes, removeCanvasFeatureBox } from './spectrogram-renderer.js';
 import { isTutorialActive, getTutorialPhase } from './tutorial-state.js';
-import { isStudyMode, isTutorialEndMode } from './master-modes.js';
+import { isStudyMode, isTutorialEndMode, isDevMode } from './master-modes.js';
 import { hasSeenTutorial } from './study-workflow.js';
 
 // Region data structure - stored per volcano
@@ -100,10 +100,10 @@ export function getCurrentRegions() {
  */
 function saveRegionsToStorage(volcano, regions) {
     if (!volcano) return;
-    
+
     try {
         const storageKey = STORAGE_KEY_PREFIX + volcano;
-        
+
         // Load existing regions from localStorage
         let existingRegions = [];
         try {
@@ -115,51 +115,45 @@ function saveRegionsToStorage(volcano, regions) {
                 }
             }
         } catch (e) {
-            // If we can't load existing, start fresh
             existingRegions = [];
         }
-        
-        // Create a map of existing regions by ID for quick lookup
-        const existingRegionsMap = new Map();
-        existingRegions.forEach(region => {
-            if (region.id !== undefined) {
-                existingRegionsMap.set(region.id, region);
-            }
-        });
-        
-        // Merge: update existing regions and add new ones
-        const mergedRegions = [...existingRegions]; // Start with all existing
-        
-        regions.forEach(newRegion => {
-            if (newRegion.id !== undefined) {
-                const existingIndex = mergedRegions.findIndex(r => r.id === newRegion.id);
-                if (existingIndex >= 0) {
-                    // Update existing region (replace it)
-                    mergedRegions[existingIndex] = newRegion;
-                } else {
-                    // Add new region
-                    mergedRegions.push(newRegion);
+
+        // Start with regions that are OUTSIDE the current data time range (preserve them)
+        const mergedRegions = [];
+
+        if (State.dataStartTime && State.dataEndTime) {
+            const dataStartMs = State.dataStartTime.getTime();
+            const dataEndMs = State.dataEndTime.getTime();
+
+            existingRegions.forEach(region => {
+                if (region.startTime && region.stopTime) {
+                    const regionStartMs = new Date(region.startTime).getTime();
+                    const regionEndMs = new Date(region.stopTime).getTime();
+
+                    // If region is completely outside current data range, preserve it
+                    if (regionEndMs < dataStartMs || regionStartMs > dataEndMs) {
+                        mergedRegions.push(region);
+                    }
+                    // If region overlaps with current range, it's controlled by in-memory array
+                    // (if deleted from memory, it stays deleted)
                 }
-            } else {
-                // Region without ID - add it (shouldn't happen, but handle gracefully)
-                mergedRegions.push(newRegion);
-            }
+            });
+        }
+
+        // Add all current in-memory regions (these are the source of truth for current time range)
+        regions.forEach(region => {
+            mergedRegions.push(region);
         });
-        
-        // Save merged regions
+
         const dataToSave = {
             volcano: volcano,
             regions: mergedRegions,
             savedAt: new Date().toISOString()
         };
         localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-        
-        const addedCount = regions.length;
-        const totalCount = mergedRegions.length;
-        console.log(`💾 Saved ${addedCount} region(s) for ${volcano} to localStorage (total: ${totalCount} regions preserved)`);
+        console.log(`💾 Saved ${regions.length} region(s) for ${volcano} to localStorage (${mergedRegions.length} total preserved)`);
     } catch (error) {
         console.error('❌ Failed to save regions to localStorage:', error);
-        // localStorage might be full or disabled - continue without persistence
     }
 }
 
@@ -396,10 +390,23 @@ function getTotalFeatureCount() {
  * Load regions from storage after data fetch completes
  * Call this after State.dataStartTime and State.dataEndTime are set
  */
-export function loadRegionsAfterDataFetch() {
+export async function loadRegionsAfterDataFetch() {
     const volcano = getCurrentVolcano();
     if (!volcano) {
         console.warn('⚠️ Cannot load regions - no volcano selected');
+        return;
+    }
+    
+    // 🔧 DEV MODE: Don't load saved regions - start fresh for testing
+    if (isDevMode()) {
+        console.log('🔧 DEV MODE: Skipping region load (starting fresh for testing)');
+        return;
+    }
+    
+    // 🎓 TUTORIAL IN PROGRESS: Don't load saved regions - tutorial creates fresh regions
+    const { isTutorialInProgress } = await import('./study-workflow.js');
+    if (isTutorialInProgress()) {
+        console.log('🎓 Tutorial in progress: Skipping region load (tutorial will create fresh regions)');
         return;
     }
     
@@ -765,19 +772,45 @@ export function createRegionFromSelectionTimes(selectionStartSeconds, selectionE
     // Hide the add region button
     hideAddRegionButton();
     
+    // 🔥 DEBUG: Log all tutorial state when region is created
+    console.log('🟡🟡🟡 [REGION CREATED] Tutorial state check:');
+    console.log(`🟡 waitingForRegionCreation: ${State.waitingForRegionCreation}`);
+    console.log(`🟡 _regionCreationResolve: ${State._regionCreationResolve ? 'EXISTS' : 'null'}`);
+    console.log(`🟡 _waveformClickResolve: ${State._waveformClickResolve ? 'EXISTS' : 'null'}`);
+    console.log(`🟡 waitingForSelection: ${State.waitingForSelection}`);
+    console.log(`🟡 _selectionTutorialResolve: ${State._selectionTutorialResolve ? 'EXISTS' : 'null'}`);
+
     // 🔥 Resolve tutorial promise if waiting for region creation
     if (State.waitingForRegionCreation && State._regionCreationResolve) {
+        console.log('🟡 [REGION CREATED] ✅ Resolving _regionCreationResolve');
         State._regionCreationResolve();
         State.setRegionCreationResolve(null);
         State.setWaitingForRegionCreation(false);
     }
+
+    // 🔥 User got ahead and created a region - resolve ALL pending tutorial promises!
+    // This can happen at waitForWaveformClick OR waitForSelection stage
+    if (State._waveformClickResolve) {
+        console.log('🟡 [REGION CREATED] ✅ Resolving _waveformClickResolve (user got ahead!)');
+        State._waveformClickResolve();
+        State.setWaveformClickResolve(null);
+    }
+    if (State.waitingForSelection && State._selectionTutorialResolve) {
+        console.log('🟡 [REGION CREATED] ✅ Resolving _selectionTutorialResolve (user got ahead!)');
+        State._selectionTutorialResolve();
+        State.setSelectionTutorialResolve(null);
+        State.setWaitingForSelection(false);
+    }
     
     // Update status message with region number (1-indexed)
-    const regionNumber = newRegionIndex + 1;
-    const statusEl = document.getElementById('status');
-    if (statusEl) {
-        statusEl.className = 'status info';
-        statusEl.textContent = `Type (${regionNumber}) to zoom into this region, or click the magnifier button.`;
+    // Skip status message during tutorial
+    if (!isTutorialActive()) {
+        const regionNumber = newRegionIndex + 1;
+        const statusEl = document.getElementById('status');
+        if (statusEl) {
+            statusEl.className = 'status info';
+            statusEl.textContent = `Type (${regionNumber}) to zoom into this region, or click the magnifier button.`;
+        }
     }
     
     // Clear the yellow selection box by clearing selection state
@@ -2983,7 +3016,11 @@ export function deleteRegion(index) {
     if (confirm('Delete this region?')) {
         const regions = getCurrentRegions();
         const deletedRegion = regions[index];
-        
+
+        // Check if user is zoomed into the region being deleted
+        const wasZoomedIntoDeletedRegion = zoomState.isInRegion() && deletedRegion && zoomState.getCurrentRegionId() === deletedRegion.id;
+
+        // Delete the region from in-memory array (setCurrentRegions saves to localStorage)
         regions.splice(index, 1);
         setCurrentRegions(regions);
         if (activeRegionIndex === index) {
@@ -2991,15 +3028,22 @@ export function deleteRegion(index) {
         } else if (activeRegionIndex > index) {
             activeRegionIndex--;
         }
-        renderRegions();
-        
+
+        // If user was zoomed into the deleted region, zoom out now
+        if (wasZoomedIntoDeletedRegion) {
+            zoomToFull();
+        } else {
+            // Only render regions if not zooming out (zoomToFull handles its own renderRegions)
+            renderRegions();
+        }
+
         // ✅ Rebuild canvas boxes (removes boxes for deleted region!)
         redrawAllCanvasFeatureBoxes();
-        
+
         // Update complete button state (in case we deleted the last identified feature)
         updateCompleteButtonState(); // Begin Analysis button
         updateCmpltButtonState(); // Complete button
-        
+
         // Redraw waveform to update button positions
         drawWaveformWithSelection();
     }
@@ -3632,6 +3676,15 @@ export function zoomToFull() {
         
         // 🔍 Diagnostic: Track zoom out complete
         console.log('✅ ZOOM OUT complete');
+        
+        // Set status message for full view (only if not in tutorial)
+        if (!isTutorialActive()) {
+            const statusEl = document.getElementById('status');
+            if (statusEl) {
+                statusEl.className = 'status info';
+                statusEl.textContent = 'Press the Complete button when you are ready to share your findings.';
+            }
+        }
     });
 
     // Update ALL zoom buttons back to 🔍
@@ -3699,24 +3752,24 @@ export async function updateCompleteButtonState() {
         return;
     }
     
-    // Always ensure button is visible
+    // 🎓 CRITICAL: Check if tutorial is IN PROGRESS - if so, don't touch button at all!
+    const { isTutorialInProgress } = await import('./study-workflow.js');
+    
+    if (isTutorialInProgress()) {
+        // Tutorial in progress - don't touch button, let tutorial control visibility
+        if (!isStudyMode()) {
+            console.log('🎓 Tutorial in progress - not touching button state');
+        }
+        return; // Exit early, let tutorial control it
+    }
+    
+    // Not in tutorial - ensure button is visible
     completeBtn.style.display = 'flex';
     completeBtn.style.alignItems = 'center';
     completeBtn.style.justifyContent = 'center';
     
     // Check if button is in "Begin Analysis" mode (before transformation) or "Complete" mode (after)
     const isBeginAnalysisMode = completeBtn.textContent === 'Begin Analysis';
-    
-    // Check if tutorial is in progress - if so, don't override button state
-    const { isTutorialInProgress } = await import('./study-workflow.js');
-    
-    if (isTutorialInProgress()) {
-        // Tutorial in progress - don't override button state, let tutorial control it
-        if (!isStudyMode()) {
-            console.log('🎓 Tutorial in progress - not changing button state');
-        }
-        return; // Exit early, let tutorial control it
-    }
     
     // Determine what should control the button state
     let shouldDisable;

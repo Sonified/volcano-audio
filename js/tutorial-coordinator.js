@@ -9,8 +9,14 @@ import {
     appendStatusText,
     addSpectrogramGlow, 
     removeSpectrogramGlow,
+    addWaveformGlow,
+    removeWaveformGlow,
+    addSpeedSliderGlow,
+    removeSpeedSliderGlow,
     addRegionsPanelGlow,
     removeRegionsPanelGlow,
+    addNotesFieldGlow,
+    removeNotesFieldGlow,
     addVolumeSliderGlow,
     removeVolumeSliderGlow,
     addLoopButtonGlow,
@@ -473,11 +479,12 @@ async function showStationMetadataMessage() {
 }
 
 async function showVolumeSliderTutorial() {
-    // Add glow to volume slider
-    addVolumeSliderGlow();
-    
     // Show message about volume adjustment
     setStatusTextAndTrack('The volume can be adjusted here. ↘️', 'status info');
+    
+    // Wait for text to finish typing, then add glow
+    await skippableWait(200);
+    addVolumeSliderGlow();
     
     // Wait 8 seconds
     await skippableWait(8000);
@@ -596,15 +603,10 @@ function waitForWaveformClick() {
             return;
         }
         
-        let safetyTimeoutId = null;
         let safetyCheckInterval = null;
         let isResolved = false;
         
         const cleanup = () => {
-            if (safetyTimeoutId !== null) {
-                clearTimeout(safetyTimeoutId);
-                safetyTimeoutId = null;
-            }
             if (safetyCheckInterval !== null) {
                 clearInterval(safetyCheckInterval);
                 safetyCheckInterval = null;
@@ -642,17 +644,13 @@ function waitForWaveformClick() {
             }
         }, 2000);
         
-        // 🔒 SAFETY: Timeout to prevent infinite wait
-        safetyTimeoutId = setTimeout(() => {
-            console.log(`⏰ waitForWaveformClick: ${USER_ACTION_TIMEOUT_MS/1000}s timeout reached - continuing tutorial`);
-            // Clear visual states before resolving
-            safetyCheckWaveformState();
-            doResolve();
-        }, USER_ACTION_TIMEOUT_MS);
+        // ⚠️ NO TIMEOUT: User MUST click waveform to proceed - this is a critical tutorial interaction
+        // The waveform is glowing at this point, so we need them to actually engage with it
+        // Enter key can still skip if needed, but no automatic timeout
         
         // Store phase for Enter key skipping (include interval in cleanup)
         // Also store promise recreator for going back
-        setTutorialPhase('waiting_for_waveform_click', [safetyTimeoutId, safetyCheckInterval], () => {
+        setTutorialPhase('waiting_for_waveform_click', [safetyCheckInterval], () => {
             console.log('🎯 waitForWaveformClick: Skipped via Enter key');
             doResolve();
         }, async () => {
@@ -709,16 +707,11 @@ function waitForSelection() {
  */
 function waitForBeginAnalysisClick() {
     return new Promise((resolve) => {
-        let safetyTimeoutId = null;
         let isResolved = false;
         
         const doResolve = () => {
             if (isResolved) return;
             isResolved = true;
-            if (safetyTimeoutId !== null) {
-                clearTimeout(safetyTimeoutId);
-                safetyTimeoutId = null;
-            }
             State.setWaitingForBeginAnalysisClick(false);
             State.setBeginAnalysisClickResolve(null);
 
@@ -732,14 +725,12 @@ function waitForBeginAnalysisClick() {
         State.setWaitingForBeginAnalysisClick(true);
         State.setBeginAnalysisClickResolve(doResolve);
 
-        // 🔒 CRITICAL ACTION: 20-second timeout - Begin Analysis is critical transition, give adequate time
-        safetyTimeoutId = setTimeout(() => {
-            console.log(`⏰ waitForBeginAnalysisClick: ${CRITICAL_ACTION_TIMEOUT_MS/1000}s timeout reached - continuing tutorial`);
-            doResolve();
-        }, CRITICAL_ACTION_TIMEOUT_MS);
+        // ⚠️ NO TIMEOUT: User MUST click Begin Analysis to end tutorial - this is a critical transition
+        // User needs to explicitly click to confirm they understand the transition from tutorial to analysis mode
+        // Enter key can still skip if needed, but no automatic timeout
 
-        // Store phase for Enter key skipping
-        setTutorialPhase('waiting_for_begin_analysis_click', [safetyTimeoutId], () => {
+        // Store phase for Enter key skipping (no timeout to auto-skip - user must click)
+        setTutorialPhase('waiting_for_begin_analysis_click', [], () => {
             console.log('🎯 Begin Analysis click: Skipped via Enter key');
             doResolve();
         });
@@ -749,8 +740,16 @@ function waitForBeginAnalysisClick() {
 /**
  * Wait for user to create a region (press R or click Add Region button)
  */
-function waitForRegionCreation() {
+function waitForRegionCreation(expectedCount = 0) {
     return new Promise((resolve) => {
+        // Check if region count already exceeds expected (user got ahead of tutorial)
+        const regions = getCurrentRegions();
+        if (regions.length > expectedCount) {
+            console.log(`🎓 Region count ${regions.length} > expected ${expectedCount} - resolving immediately`);
+            resolve();
+            return;
+        }
+        
         let safetyTimeoutId = null;
         let isResolved = false;
         
@@ -780,9 +779,9 @@ function waitForRegionCreation() {
         setTutorialPhase('waiting_for_region_creation', [safetyTimeoutId], () => {
             doResolve();
         }, async () => {
-            // Promise recreator: call waitForRegionCreation again
+            // Promise recreator: call waitForRegionCreation again with same expectedCount
             console.log('🔄 Recreating waitForRegionCreation promise');
-            await waitForRegionCreation();
+            await waitForRegionCreation(expectedCount);
         });
     });
 }
@@ -1092,16 +1091,21 @@ function waitForFrequencyScaleKeys() {
 /**
  * Wait for user to complete feature selection (draw a box on spectrogram)
  */
-function waitForFeatureSelection() {
+function waitForFeatureSelection(expectedCount = 0) {
     return new Promise((resolve) => {
-        // Check if feature is already selected
+        // Check if feature count already exceeds expected (user got ahead)
         const activeRegionIndex = getActiveRegionIndex();
         if (activeRegionIndex !== null) {
             const regions = getCurrentRegions();
             const region = regions[activeRegionIndex];
-            if (region && region.features && region.features[0]) {
-                const feature = region.features[0];
-                if (feature.lowFreq && feature.highFreq && feature.startTime && feature.endTime) {
+            if (region && region.features) {
+                // Count features that have complete selections (all 4 properties)
+                const completeFeatures = region.features.filter(f => 
+                    f.lowFreq && f.highFreq && f.startTime && f.endTime
+                ).length;
+                
+                if (completeFeatures > expectedCount) {
+                    console.log(`🎓 Feature count ${completeFeatures} > expected ${expectedCount} - resolving immediately`);
                     resolve();
                     return;
                 }
@@ -1127,14 +1131,11 @@ function waitForFeatureSelection() {
         State.setWaitingForFeatureSelection(true);
         State.setFeatureSelectionResolve(doResolve);
         
-        // 🔒 CRITICAL ACTION: 20-second timeout - feature selection is critical for study, give adequate time
-        safetyTimeoutId = setTimeout(() => {
-            console.log(`⏰ waitForFeatureSelection: ${CRITICAL_ACTION_TIMEOUT_MS/1000}s timeout reached - continuing tutorial`);
-            doResolve();
-        }, CRITICAL_ACTION_TIMEOUT_MS);
+        // 🔒 NO TIMEOUT - User MUST create features to continue tutorial
+        // Feature creation is required, so we wait indefinitely
         
-        // Store phase for Enter key skipping
-        setTutorialPhase('waiting_for_feature_selection', [safetyTimeoutId], () => {
+        // Store phase (no timeout to skip - user must complete this action)
+        setTutorialPhase('waiting_for_feature_selection', [], () => {
             doResolve();
         });
     });
@@ -1157,6 +1158,7 @@ function waitForFeatureDescription(regionIndex, featureIndex) {
         let timeoutId = null;
         let handleChange = null;
         let handleBlur = null;
+        let handleKeydown = null;
         
         const cleanup = () => {
             if (isResolved) return;
@@ -1167,12 +1169,10 @@ function waitForFeatureDescription(regionIndex, featureIndex) {
                 timeoutId = null;
             }
             
-            if (handleChange) {
-                notesField.removeEventListener('change', handleChange);
-            }
-            if (handleBlur) {
-                notesField.removeEventListener('blur', handleBlur);
-            }
+            if (handleChange) notesField.removeEventListener('change', handleChange);
+            if (handleBlur) notesField.removeEventListener('blur', handleBlur);
+            if (handleKeydown) notesField.removeEventListener('keydown', handleKeydown);
+            
             State.setWaitingForFeatureDescription(false);
             State.setFeatureDescriptionResolve(null);
         };
@@ -1184,51 +1184,45 @@ function waitForFeatureDescription(regionIndex, featureIndex) {
             resolve();
         };
         
-        // Check if already has content
-        if (notesField.value.trim()) {
-            // Wait for change event (text submitted) or blur
-            handleChange = () => {
-                // Text has been submitted/saved
-                doResolve();
-            };
-            
-            handleBlur = () => {
-                // User exited the field - if it has content, count as completion
+        // Listen for Enter key - only advances if field has content
+        handleKeydown = (e) => {
+            console.log('🔑 Keydown in notes field:', e.key, 'shiftKey:', e.shiftKey, 'hasContent:', !!notesField.value.trim());
+            if (e.key === 'Enter' && !e.shiftKey) { // Shift+Enter = new line, Enter alone = submit
                 if (notesField.value.trim()) {
+                    e.preventDefault(); // Don't add newline
+                    e.stopPropagation(); // Don't bubble to global Enter handler
+                    console.log('✅ Feature description submitted via Enter key');
                     doResolve();
+                } else {
+                    console.log('⚠️ Enter pressed but field is empty - not advancing');
                 }
-            };
-            
-            notesField.addEventListener('change', handleChange);
-            notesField.addEventListener('blur', handleBlur);
-            
-            // 🔒 CRITICAL ACTION: 20-second timeout - feature description is part of study data
-            timeoutId = setTimeout(() => {
-                doResolve();
-            }, CRITICAL_ACTION_TIMEOUT_MS);
-            
-            return;
-        }
-        
-        // Set flag so we can resolve when user types and submits
-        State.setWaitingForFeatureDescription(true);
-        State.setFeatureDescriptionResolve(doResolve);
-        
-        // Listen for 'change' event - fires when text is submitted/saved (on blur after typing)
-        handleChange = () => {
-            // Text has been submitted/saved
-            doResolve();
+            }
         };
         
+        // Listen for blur (click away) - only advances if field has content
         handleBlur = () => {
-            // If field has content when user exits, count as completion
-            if (notesField.value.trim() || State.waitingForFeatureDescription) {
+            if (notesField.value.trim()) {
+                console.log('✅ Feature description submitted via blur');
                 doResolve();
             }
         };
         
-        notesField.addEventListener('change', handleChange);
+        // Listen for change event (backup) - only advances if field has content
+        handleChange = () => {
+            if (notesField.value.trim()) {
+                console.log('✅ Feature description submitted via change event');
+                doResolve();
+            }
+        };
+        
+        // Attach all listeners
+        notesField.addEventListener('keydown', handleKeydown);
         notesField.addEventListener('blur', handleBlur);
+        notesField.addEventListener('change', handleChange);
+        
+        // Set state
+        State.setWaitingForFeatureDescription(true);
+        State.setFeatureDescriptionResolve(doResolve);
         
         // 🔒 CRITICAL ACTION: 20-second timeout - feature description is part of study data, give adequate time
         timeoutId = setTimeout(() => {
@@ -1465,146 +1459,170 @@ function waitForNumberKeyPress(targetKey) {
 }
 
 async function runSelectionTutorial() {
-    // 🎓 Check if user already made a selection (got ahead of tutorial)
-    // Check if selection exists AND we're waiting for region creation (meaning user got ahead)
+    console.log('🔴🔴🔴 [SELECTION] ========== STARTING ==========');
+
+    // Helper to check if user got ahead and created a region
+    const userCreatedRegion = () => getCurrentRegions().length > 0;
+
+    // 🎓 Check if user already made a selection or region (got ahead of tutorial)
     if (State.selectionStart !== null && State.selectionEnd !== null) {
-        if (State.waitingForRegionCreation) {
-            // User already made selection - skip selection tutorial and go straight to region creation
-            console.log('🎓 Tutorial: User already made selection, skipping selection tutorial');
-            return; // Will continue to runRegionIntroduction
-        }
-        // If selection exists but we're not waiting for region creation yet, 
-        // it means selection was made during this tutorial - resolve immediately
-        if (State.waitingForSelection && State._selectionTutorialResolve) {
-            console.log('🎓 Tutorial: Selection already exists, resolving immediately');
-            State._selectionTutorialResolve();
-            State.setSelectionTutorialResolve(null);
-            State.setWaitingForSelection(false);
-            // Show "Nice!" message
-            await skippableWait(500);
-            setStatusTextAndTrack('Nice!', 'status success');
-            await skippableWait(1000);
-            clearTutorialPhase();
-            return; // Skip the rest of selection tutorial
-        }
+        console.log('🎓 Tutorial: Selection already exists at start');
+        await skippableWait(500);
+        setStatusTextAndTrack('Nice!', 'status success');
+        await skippableWait(1000);
+        clearTutorialPhase();
+        return;
     }
-    
+    if (userCreatedRegion()) {
+        console.log('🎓 Tutorial: Region already exists at start - skipping selection tutorial');
+        clearTutorialPhase();
+        return;
+    }
+
+    // 🔥 NEW: Set up a persistent region creation listener for the ENTIRE function
+    let regionCreatedDuringTutorial = false;
+    let regionCreationResolve = null;
+    const regionCreatedPromise = new Promise(resolve => {
+        regionCreationResolve = () => {
+            regionCreatedDuringTutorial = true;
+            resolve();
+        };
+        // Hook into the existing region creation system
+        const originalResolve = State._regionCreationResolve;
+        State.setWaitingForRegionCreation(true);
+        State.setRegionCreationResolve(() => {
+            regionCreationResolve();
+            // Also call original if it existed
+            if (originalResolve) originalResolve();
+        });
+    });
+
+    // Helper to bail out if region was created
+    const checkAndBailIfRegionCreated = async () => {
+        if (regionCreatedDuringTutorial || userCreatedRegion()) {
+            console.log('🎓 Tutorial: Region created - bailing out of selection tutorial!');
+            State.setWaitingForRegionCreation(false);
+            State.setRegionCreationResolve(null);
+            // Don't show message here - runRegionIntroduction() will show "Great! You created a region!"
+            clearTutorialPhase();
+            return true;
+        }
+        return false;
+    };
+
     // Set up the promise FIRST before showing the message to avoid race conditions
     const clickPromise = waitForWaveformClick();
-    
+
     // Now enable waveform tutorial (shows message and enables clicks)
     await enableWaveformTutorial();
-    
-    // Wait for user to click waveform first
-    await clickPromise;
-    
-    // 🎓 Check again if selection was made while waiting for click
-    if (State.selectionStart !== null && State.selectionEnd !== null && State.waitingForRegionCreation) {
-        console.log('🎓 Tutorial: Selection made during click wait, skipping drag message');
-        return; // Skip drag message and go to region creation
-    }
-    
-    // Wait 5 seconds after waveform click, then show drag message
-    await skippableWait(5000);
-    
-    // 🎓 Check if selection already exists (user might have skipped ahead with Enter or made selection)
-    if (State.selectionStart !== null && State.selectionEnd !== null) {
-        if (State.waitingForRegionCreation) {
-            console.log('🎓 Tutorial: Selection made during wait, skipping drag message');
-            return; // Skip drag message and go to region creation
-        } else {
-            console.log('🎓 Tutorial: Selection already exists, skipping drag message');
-            // Skip the message and wait, go straight to "Nice!"
-            await skippableWait(500);
-            setStatusTextAndTrack('Nice!', 'status success');
-            await skippableWait(1000);
-            clearTutorialPhase();
-            return;
-        }
-    }
-    
+
+    // 🔥 RACE: Wait for click OR region creation
+    await Promise.race([clickPromise, regionCreatedPromise]);
+    if (await checkAndBailIfRegionCreated()) return;
+
+    // 🔥 RACE: 5-second wait OR region creation
+    await Promise.race([skippableWait(5000), regionCreatedPromise]);
+    if (await checkAndBailIfRegionCreated()) return;
+
     setStatusTextAndTrack('Now click on the waveform and DRAG and RELEASE to make a selection.', 'status info');
-    
-    // Set up selection promise first
+
+    // Set up selection promise
     const selectionPromise = waitForSelection();
-    
-    // Race between 10 second wait and selection completion
-    // If selection completes first, skip the append message
-    const timeoutPromise = skippableWait(10000).then(() => 'timeout');
-    const selectionRacePromise = selectionPromise.then(() => 'selection');
-    
-    const raceResult = await Promise.race([selectionRacePromise, timeoutPromise]);
-    
+
+    // 🔥 RACE: selection OR timeout OR region creation
+    const raceResult = await Promise.race([
+        selectionPromise.then(() => 'selection'),
+        skippableWait(10000).then(() => 'timeout'),
+        regionCreatedPromise.then(() => 'region')
+    ]);
+
+    if (raceResult === 'region' || await checkAndBailIfRegionCreated()) return;
+
     // Only append if timeout won AND selection hasn't happened yet
     if (raceResult === 'timeout' && (State.selectionStart === null || State.selectionEnd === null)) {
         appendStatusText('Just click and draaaaag.', 20, 10);
-        // Wait for selection to complete
-        await selectionPromise;
-    } else if (raceResult === 'selection') {
-        // Selection completed first - the promise already resolved via Promise.race
-        // Ensure the selection state is properly set before continuing
-        // Add a small delay to ensure all state updates have propagated
-        await new Promise(resolve => setTimeout(resolve, 0));
+
+        setTutorialPhase('waiting_for_selection', [], () => {
+            console.log('⚡ Selection wait skipped via Enter key');
+            State.setWaitingForSelection(false);
+            State.setSelectionTutorialResolve(null);
+        });
+
+        // 🔥 RACE: selection OR region creation
+        await Promise.race([selectionPromise, regionCreatedPromise]);
+        if (await checkAndBailIfRegionCreated()) return;
     }
 
-    // 🔥 FIX: Show "Nice!" message after selection completes (was missing!)
+    // 🔥 Final cleanup of region listener
+    State.setWaitingForRegionCreation(false);
+    State.setRegionCreationResolve(null);
+
+    // 🔥 Show "Nice!" message after selection completes
     await skippableWait(500);
     setStatusTextAndTrack('Nice!', 'status success');
     await skippableWait(1000);
 
-    // Note: Region creation is already enabled by study-workflow.js before tutorial starts
-
-    // Selection tutorial complete - transition to region introduction
-    // Clear tutorial phase
+    console.log('🔴🔴🔴 [SELECTION] ========== COMPLETE ==========');
     clearTutorialPhase();
 }
 
 async function runRegionIntroduction() {
-    // 🎓 ALWAYS show the instruction, even if a region already exists
-    // Track region count BEFORE showing instruction to detect if one was just created
+    console.log('🟢🟢🟢 [REGION INTRO] ========== STARTING ==========');
+
+    // 🎓 Check if region was already created during selection tutorial (user got ahead!)
     const regionsBefore = getCurrentRegions();
     const regionCountBefore = regionsBefore.length;
-    
-    // Show the "Click Add Region" message (always show instruction)
-    setStatusTextAndTrack('Click Add Region or type (R) to create a new region.', 'status info');
-    
-    // Wait for user to create a region
-    await waitForRegionCreation();
-    
-    // 🔥 FIX: Check AFTER waiting - waitForRegionCreation can resolve via timeout/Enter key
-    // but that doesn't mean a region was actually created!
-    let regions = getCurrentRegions();
-    let hasRegion = regions.length > 0;
-    
-    // Keep waiting until a region actually exists
-    while (!hasRegion) {
-        console.log('🎓 Tutorial: waitForRegionCreation resolved but no region exists yet - waiting again');
-        // Keep showing the instruction message
-        setStatusTextAndTrack('Click Add Region or type (R) to create a new region.', 'status info');
-        // Wait again for region creation
+    const userGotAhead = regionCountBefore > 0; // Track if they skipped ahead
+    console.log(`🟢 [REGION INTRO] regionCountBefore=${regionCountBefore}, userGotAhead=${userGotAhead}`);
+
+    if (userGotAhead) {
+        // Region already exists! User got ahead during selection tutorial
+        console.log('🟢 [REGION INTRO] ✅ User got ahead! Quick celebration then skip.');
+        // Clear the waiting flag since region already exists
+        State.setWaitingForRegionCreation(false);
+        State.setRegionCreationResolve(null);
+        // Quick celebration then move on
+        setStatusTextAndTrack('Great! You created a region!', 'status success');
+        await skippableWait(1000);
+        console.log('🟢 [REGION INTRO] Skipping to play button...');
+    } else {
+        console.log('🟢 [REGION INTRO] No region yet - showing instruction...');
+        // No region yet - show the instruction
+        setStatusTextAndTrack('Click the ADD REGION button or type (R) to create a new region.', 'status info');
+
+        // Wait for user to create a region
         await waitForRegionCreation();
-        // Check again
-        regions = getCurrentRegions();
-        hasRegion = regions.length > 0;
-    }
-    
-    // Only show "You just created your first region!" if a NEW region was created during the wait
-    const regionCountAfter = regions.length;
-    if (regionCountAfter > regionCountBefore) {
+
+        // 🔥 FIX: Check AFTER waiting - waitForRegionCreation can resolve via timeout/Enter key
+        // but that doesn't mean a region was actually created!
+        let regions = getCurrentRegions();
+        let hasRegion = regions.length > 0;
+
+        // Keep waiting until a region actually exists
+        while (!hasRegion) {
+            console.log('🎓 Tutorial: waitForRegionCreation resolved but no region exists yet - waiting again');
+            // Keep showing the instruction message
+            setStatusTextAndTrack('Click the ADD REGION button or type (R) to create a new region.', 'status info');
+            // Wait again for region creation
+            await waitForRegionCreation();
+            // Check again
+            regions = getCurrentRegions();
+            hasRegion = regions.length > 0;
+        }
+
+        // Show "You just created your first region!" celebration
         setStatusTextAndTrack('You just created your first region!', 'status success');
         await skippableWait(2000);
-    } else {
-        // Region already existed - skip the "just created" message but continue tutorial
-        console.log('🎓 Tutorial: Region already existed, skipping "just created" message');
+
+        // Add glow to regions panel and show message about regions being added below
+        addRegionsPanelGlow();
+        setStatusTextAndTrack('When a new region is created, it gets added down below 👇', 'status info');
+        await skippableWait(5000);
+        removeRegionsPanelGlow();
     }
-    
+
     // Disable all region buttons during tutorial explanation
     disableRegionButtons();
-    
-    // Add glow to regions panel and show message about regions being added below
-    addRegionsPanelGlow();
-    setStatusTextAndTrack('When a new region is created, it gets added down below 👇', 'status info');
-    await skippableWait(6000);
     
     // Remove glow and enable play button for region 1 (index 0)
     removeRegionsPanelGlow();
@@ -1715,7 +1733,7 @@ async function runRegionZoomingTutorial() {
     await waitForRegionPlayOrResume();
     
     // Give freedom message and keep it on screen longer
-    setStatusTextAndTrack('Feel free to play and pause as you wish from here on out!', 'status info');
+    setStatusTextAndTrack('Feel free to PLAY and PAUSE as you wish from here on out!', 'status info');
     await skippableWait(4000);
     
     // Clear tutorial phase
@@ -1741,7 +1759,7 @@ async function runFrequencyScaleTutorial() {
     await skippableWait(5000);
     
     // Invite user to click and change to another frequency scale
-    setStatusTextAndTrack('Try changing to another frequency scale in the lower right hand corner 👇', 'status info');
+    setStatusTextAndTrack('Try changing the frequency scale in the lower right hand corner 👇', 'status info');
     
     // Wait for user to click the dropdown (then remove glow)
     await waitForFrequencyScaleClick();
@@ -1752,10 +1770,10 @@ async function runFrequencyScaleTutorial() {
     // Wait for user to change frequency scale
     await waitForFrequencyScaleChange();
     
-    // Briefly congratulate using same pacing as before (1s wait, "Great!", 2s wait)
-    await skippableWait(1000);
+    // Briefly congratulate using same pacing as before (0.5s wait, "Great!", 1.5s wait)
+    await skippableWait(500);
     setStatusTextAndTrack('Great!', 'status success');
-    await skippableWait(2000);
+    await skippableWait(1500);
     
     // Tell user about keyboard shortcuts
     setStatusTextAndTrack('You can also press (C) (V) and (B) on the keyboard to switch between modes, try this now.', 'status info');
@@ -1773,7 +1791,7 @@ async function runFrequencyScaleTutorial() {
     // Final message
     await skippableWait(2000);
     setStatusTextAndTrack('Pick a scaling that works well and let\'s explore.', 'status info');
-    await skippableWait(6000);
+    await skippableWait(4000);
     
     // Clear tutorial phase
     clearTutorialPhase();
@@ -1799,8 +1817,8 @@ async function runFeatureSelectionTutorial() {
         return;
     }
     
-    const regions = getCurrentRegions();
-    const region = regions[activeRegionIndex];
+    let regions = getCurrentRegions();
+    let region = regions[activeRegionIndex];
     if (!region || !region.features || region.features.length === 0) {
         console.warn('⚠️ Feature selection tutorial: No features in region');
         return;
@@ -1811,17 +1829,21 @@ async function runFeatureSelectionTutorial() {
     // Disable add feature button
     disableAddFeatureButton(activeRegionIndex);
     
-    // "Have a look and listen around this region... what do you notice?" (8s)
+    // "Have a look and listen around this region... what do you notice?" (7s)
     setStatusTextAndTrack('Have a look and listen around this region... what do you notice?', 'status info');
-    await skippableWait(8000);
+    await skippableWait(7000);
     
-    // "Click anywhere on the waveform and create new selections." (5s)
-    setStatusTextAndTrack('Click anywhere on the waveform and create new selections.', 'status info');
+    // "Click anywhere on the waveform to make a new selection." (5s)
+    addWaveformGlow();
+    setStatusTextAndTrack('Click anywhere on the waveform to make a new selection.', 'status info');
     await skippableWait(5000);
+    removeWaveformGlow();
     
-    // "Feel free to change the playback speed!" (10s)
+    // "Feel free to change the playback speed!" (5s)
+    addSpeedSliderGlow();
     setStatusTextAndTrack('Feel free to change the playback speed!', 'status info');
-    await skippableWait(10000);
+    await skippableWait(5000);
+    removeSpeedSliderGlow();
     
     // "Once you've found something interesting, let's mark it as a feature."
     setStatusTextAndTrack('Once you\'ve found something interesting, let\'s mark it as a feature.', 'status info');
@@ -1859,53 +1881,35 @@ async function runFeatureSelectionTutorial() {
     setStatusTextAndTrack('You\'ve identified a feature!', 'status success');
     await skippableWait(3000);
     
-    // "Add any notes in the description box below about what you're noticing." (8s)
+    // "Add any notes in the description box below about what you're noticing." (6s)
     setStatusTextAndTrack('Add any notes in the description box below about what you\'re noticing.', 'status info');
-    await skippableWait(8000);
     
-    // "There are no right or wrong answers, just observations" (8s)
-    setStatusTextAndTrack('There are no right or wrong answers, just observations', 'status info');
-    await skippableWait(8000);
+    // Add glow to notes field to draw attention
+    addNotesFieldGlow(activeRegionIndex, featureIndex);
     
-    // "Take a moment to provide a description." (4s)
-    setStatusTextAndTrack('Take a moment to provide a description.', 'status info');
-    await skippableWait(4000);
-    
-    // "When you are done, you can hit enter/return."
-    setStatusTextAndTrack('When you are done, you can hit enter/return.', 'status info');
-    
-    // Set up listener to switch message as soon as user starts typing
-    const notesField = document.getElementById(`notes-${activeRegionIndex}-${featureIndex}`);
-    let messageSwitched = false;
-    let typingListener = null;
-    
-    if (notesField) {
-        typingListener = () => {
-            if (!messageSwitched && notesField.value.trim().length > 0) {
-                messageSwitched = true;
-                setStatusTextAndTrack('When you are done, you can hit enter/return.', 'status info');
-                notesField.removeEventListener('input', typingListener);
-            }
-        };
-        notesField.addEventListener('input', typingListener);
-    }
-    
-    // Wait 10s, but if they start typing, the message will switch immediately
-    await skippableWait(10000);
-    
-    // If they haven't started typing yet, show the "When you are done" message now
-    if (!messageSwitched) {
-        setStatusTextAndTrack('When you are done, you can hit enter/return.', 'status info');
-        if (notesField && typingListener) {
-            notesField.removeEventListener('input', typingListener);
+    // Show encouraging messages in background while they type (won't block progress)
+    (async () => {
+        await skippableWait(6000);
+        // Only show if still waiting for description
+        if (State.waitingForFeatureDescription) {
+            setStatusTextAndTrack('There are no right or wrong answers, just observations', 'status info');
         }
-    }
-    
-    // Wait for description completion
+        await skippableWait(6000);
+        if (State.waitingForFeatureDescription) {
+            setStatusTextAndTrack('When you\'re done, press Enter or click elsewhere to continue.', 'status info');
+        }
+    })();
+
+    // Wait for description - this is the ONLY thing we're waiting for
+    // When they submit (Enter or blur with content), we move on immediately
     await waitForFeatureDescription(activeRegionIndex, featureIndex);
     
-    // Pause 1s
-    await skippableWait(1000);
+    // Remove glow from notes field
+    removeNotesFieldGlow(activeRegionIndex, featureIndex);
+    
+    // Celebrate their description!
+    setStatusTextAndTrack('Nice!', 'status success');
+    await skippableWait(1500);
     
     // Highlight repetition dropdown (far left)
     addRepetitionDropdownGlow(activeRegionIndex, featureIndex);
@@ -1917,14 +1921,16 @@ async function runFeatureSelectionTutorial() {
     
     const dropdownResult = await Promise.race([dropdownClickPromise, dropdownTimeoutPromise]);
     
-    // If they clicked, wait 1s, otherwise just continue
+    // If they clicked, wait 3s, otherwise just continue
     if (!State.waitingForRepetitionDropdown) {
         // They clicked
-        await skippableWait(1000);
+        console.log('🎯 [TUTORIAL] Repetition dropdown clicked - waiting 3s');
+        await skippableWait(3000);
     }
     
     // Remove repetition dropdown glow
     removeRepetitionDropdownGlow(activeRegionIndex, featureIndex);
+    console.log('🎯 [TUTORIAL] Moving to type dropdown');
     
     // Highlight type dropdown (impulsive/continuous)
     addTypeDropdownGlow(activeRegionIndex, featureIndex);
@@ -1936,43 +1942,41 @@ async function runFeatureSelectionTutorial() {
     
     const typeDropdownResult = await Promise.race([typeDropdownClickPromise, typeDropdownTimeoutPromise]);
     
-    // If they clicked, wait 1s, otherwise just continue
+    // If they clicked, wait 3s, otherwise just continue
     if (!State.waitingForTypeDropdown) {
         // They clicked
-        await skippableWait(1000);
+        console.log('🎯 [TUTORIAL] Type dropdown clicked - waiting 3s');
+        await skippableWait(3000);
     }
     
     // Remove type dropdown glow
     removeTypeDropdownGlow(activeRegionIndex, featureIndex);
+    console.log('🎯 [TUTORIAL] Moving to select feature button explanation');
     
-    // Glow select feature button (but don't make it red/active, just glow it)
-    // Don't call enableSelectFeatureButton - keep it in normal mode
+    // Highlight the select feature button and explain it's for future use
     addSelectFeatureButtonGlow(activeRegionIndex, featureIndex);
-    setStatusTextAndTrack('Click this box to re-do your selection.', 'status info');
-    await skippableWait(9000);
-    
-    // Remove select feature button glow
+    setStatusTextAndTrack('In the future, you can use this box to change your selection (it\'s disabled for now).', 'status info');
+    await skippableWait(4000);
     removeSelectFeatureButtonGlow(activeRegionIndex, featureIndex);
     
-    // Enable add feature button
-    enableAddFeatureButton(activeRegionIndex);
+    console.log('🎯 [TUTORIAL] Moving to SECOND FEATURE selection on spectrogram');
+    // Now tell them to draw a second feature and highlight spectrogram at the same time
+    addSpectrogramGlow();
+    setStatusTextAndTrack('To add another feature, just click and drag on the spectrogram to draw a new box.', 'status info');
     
-    // Small delay to ensure button is rendered
-    await skippableWait(100);
+    // Get current feature count (reuse regions variable from earlier in function)
+    let currentRegion = regions[activeRegionIndex];
+    const featureCountBefore = currentRegion ? currentRegion.features.length : 1;
     
-    // Highlight add feature button (keep glow until clicked)
-    addAddFeatureButtonGlow(activeRegionIndex);
-    setStatusTextAndTrack('Click the green circle 🟢 in the lower left corner to add another feature.', 'status info');
+    // Wait for them to create a SECOND feature (expectedCount = 1 means wait until completeFeatures > 1)
+    await waitForFeatureSelection(1);
     
-    // Wait for user to click add feature button (glow stays until clicked)
-    await waitForAddFeatureButtonClick(activeRegionIndex);
+    // Remove spectrogram glow
+    removeSpectrogramGlow();
     
-    // Remove add feature button glow
-    removeAddFeatureButtonGlow(activeRegionIndex);
-    
-    // Say "Great!" and wait 4s
-    setStatusTextAndTrack('Great! There\'s no need to select another feature now.', 'status success');
-    await skippableWait(4000);
+    // Show celebration
+    setStatusTextAndTrack('Excellent!', 'status success');
+    await skippableWait(1500);
     
     // Clear tutorial phase
     clearTutorialPhase();
@@ -2036,8 +2040,8 @@ async function runSecondRegionTutorial() {
     
     setStatusTextAndTrack('Click and drag on the waveform to create a new region.', 'status info');
     
-    // Wait for user to create a region
-    await waitForRegionCreation();
+    // Wait for user to create a SECOND region (expectedCount = 1 means wait until regions.length > 1)
+    await waitForRegionCreation(1);
     
     // Remove waveform border highlight and overlay when region is created
     if (waveformCanvas) {
@@ -2096,8 +2100,8 @@ async function runSecondRegionTutorial() {
         // Wait 1s
         await skippableWait(1000);
         
-        // Say "This Tutorial is now complete! Continue your analysis and hit Submit when you are done."
-        setStatusTextAndTrack('This Tutorial is now complete! Continue your analysis and hit Submit when you are done.', 'status success');
+        // Say "This Tutorial is now complete!"
+        setStatusTextAndTrack('This Tutorial is now complete!', 'status success');
         
         // Enable all features right after "This Tutorial is now complete!" message
         const { enableAllTutorialRestrictedFeatures } = await import('./tutorial-effects.js');
@@ -2453,15 +2457,13 @@ export async function runInitialTutorial() {
         disableWaveformClicks();
         console.log('🔒 Waveform clicks DISABLED at tutorial start');
         
-        // 🔒 HARD DISABLE Begin Analysis button at tutorial start (first visit only)
+        // 🔒 HIDE Begin Analysis button at tutorial start (first visit only)
         const { hasSeenTutorial } = await import('./study-workflow.js');
         if (!hasSeenTutorial()) {
             const completeBtn = document.getElementById('completeBtn');
             if (completeBtn) {
-                completeBtn.disabled = true;
-                completeBtn.style.opacity = '0.5';
-                completeBtn.style.cursor = 'not-allowed';
-                console.log('🔒 Begin Analysis button HARD DISABLED at tutorial start');
+                completeBtn.style.display = 'none';
+                console.log('🔒 Begin Analysis button HIDDEN at tutorial start');
             }
             
             // ✅ Enable region creation NOW (tutorial needs it, but only during tutorial)

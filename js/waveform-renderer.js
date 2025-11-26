@@ -607,9 +607,8 @@ export function drawWaveformWithSelection() {
     drawRegionHighlights(ctx, canvas.width, canvas.height);
     drawRegionButtons(); // Draw buttons on overlay canvas
     
-    // Only draw yellow selection box if NOT playing an active region
-    // When playing a region, we only want the blue region highlight, not the yellow selection box
-    if (State.selectionStart !== null && State.selectionEnd !== null && !isPlayingActiveRegion()) {
+    // Draw yellow selection box if selection exists
+    if (State.selectionStart !== null && State.selectionEnd !== null) {
         // 🏛️ Use zoom-aware conversion
         let startX, endX;
         if (zoomState.isInitialized()) {

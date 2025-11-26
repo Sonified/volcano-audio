@@ -250,6 +250,18 @@ export function initTutorial() {
                 }
                 // Enter/Return: Still works for backward compatibility
                 else if (e.key === 'Enter' || e.key === 'Return') {
+                    // Skip if in an input field (same check as above for Right Arrow)
+                    const activeElement = document.activeElement;
+                    const isInputField = activeElement && (
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.isContentEditable
+                    );
+                    
+                    if (isInputField) {
+                        return; // Let the input field handle the Enter key
+                    }
+                    
                     e.preventDefault();
                     console.log('⌨️ Enter key detected! tutorialPhase:', tutorialPhase);
 

@@ -792,36 +792,22 @@ export async function startStudyWorkflow() {
             }
         }
     }
-    
-    // 🔥 CORRUPTED STATE CHECK: Incomplete onboarding? Reset to brand new
+
+    // 🔥 INCOMPLETE ONBOARDING: User saw setup/welcome but didn't start or complete tutorial
+    // Instead of nuking everything, just mark tutorial as in progress and resume
     const hasPreSurvey = localStorage.getItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE) !== null;
     const isInTutorial = isTutorialInProgress();
-    
-    // Case 1: Seen participant setup but no tutorial completion AND not actively in tutorial
+
     if (hasSeenParticipantSetup() && !tutorialCompleted() && !isInTutorial) {
-        console.log('⚠️ CORRUPTED STATE: User has seen participant setup but never completed tutorial');
+        console.log('🔄 INCOMPLETE ONBOARDING: User saw setup but tutorial not started/completed');
         console.log(`   Has pre-survey: ${hasPreSurvey}, Tutorial in progress: ${isInTutorial}`);
-        console.log('🧹 Resetting to brand new participant state...');
-        
-        // Clear ALL study workflow flags
-        Object.entries(STORAGE_KEYS).forEach(([name, key]) => {
-            localStorage.removeItem(key);
-        });
-        console.log('✅ All flags cleared - will restart from participant setup');
+        console.log('🎓 Marking tutorial as in progress and resuming...');
+
+        // Mark tutorial as in progress so we resume properly
+        markTutorialAsInProgress();
+        console.log('✅ Tutorial marked as in progress - will show tutorial intro modal');
     }
-    
-    // Case 2: Completed pre-survey but tutorial is not in progress AND not completed (stopped between pre-survey and tutorial)
-    if (hasPreSurvey && !tutorialCompleted() && !isInTutorial) {
-        console.log('⚠️ CORRUPTED STATE: User completed pre-survey but stopped before tutorial');
-        console.log('🧹 Resetting to brand new participant state...');
-        
-        // Clear ALL study workflow flags
-        Object.entries(STORAGE_KEYS).forEach(([name, key]) => {
-            localStorage.removeItem(key);
-        });
-        console.log('✅ All flags cleared - will restart from participant setup');
-    }
-    
+
     // 🔥 STUDY CLEAN MODE OR TUTORIAL_END: Reset EVERYTHING (always act like first time)
     const storedMode = typeof localStorage !== 'undefined' ? localStorage.getItem('selectedMode') : null;
     const isTestMode = storedMode === 'tutorial_end';

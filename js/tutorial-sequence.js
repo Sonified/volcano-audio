@@ -423,7 +423,7 @@ export async function startSpeedSliderTutorial() {
             
             // Show initial message with typing animation
             const initialSpeedText = speedValueEl.textContent || '1.0x';
-            setStatusText(`↙️ Click on the GLOWING text that says "Speed: ${initialSpeedText}" to reset the playback speed.`, 'status info');
+            setStatusText(`↙️ Click on the RED text that says "Speed: ${initialSpeedText}" to reset the playback speed.`, 'status info');
             
             // Function to update just the speed value without retyping
             const updateSpeedMessage = () => {

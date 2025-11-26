@@ -201,7 +201,7 @@ function handleKeyboardShortcut(event) {
         return;
     }
     
-    // Escape key: Exit feature selection mode first, then zoom back out to full view
+    // Escape key: Zoom out immediately (exiting feature selection mode as part of the same action)
     if (event.key === 'Escape') {
         console.log('🔍 [ESCAPE DEBUG] Escape key pressed');
         console.log('🔍 [ESCAPE DEBUG] isTypingInField:', isTypingInField);
@@ -212,22 +212,21 @@ function handleKeyboardShortcut(event) {
             activeRegionId: zoomState.activeRegionId,
             initialized: zoomState.isInitialized()
         });
-        
+
         // If typing in a field, blur it first so Escape works
         if (isTypingInField) {
             console.log('🔍 [ESCAPE DEBUG] Blurring active input/textarea');
             event.target.blur();
         }
-        
-        // First priority: Exit feature selection mode if active
+
+        // Exit feature selection mode if active (as part of zoom out, not a separate step)
         if (isInFrequencySelectionMode()) {
-            console.log('🔍 [ESCAPE DEBUG] Exiting feature selection mode');
-            event.preventDefault();
+            console.log('🔍 [ESCAPE DEBUG] Exiting feature selection mode as part of zoom out');
             stopFrequencySelection();
-            return;
+            // Don't return - continue to zoom out
         }
-        
-        // Second priority: Zoom out if in a region
+
+        // Zoom out if in a region
         if (zoomState.isInRegion()) {
             // console.log('🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴');
             // console.log('🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴');

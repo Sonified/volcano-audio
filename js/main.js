@@ -572,6 +572,10 @@ export async function startStreaming(event) {
             console.log('🎬 [0ms] startStreaming() called');
         }
         
+        // Disable auto-resize during data fetch to prevent text shrinking
+        const { disableAutoResize } = await import('./status-auto-resize.js');
+        disableAutoResize();
+        
         const stationValue = document.getElementById('station').value;
         if (!stationValue) {
             alert('Please select a station');
@@ -992,6 +996,11 @@ export async function startStreaming(event) {
             
             // Data fetch completed successfully - mark this volcano as having data
             State.setVolcanoWithData(volcano);
+            
+            // Re-enable auto-resize now that fetch is complete
+            const { enableAutoResize } = await import('./status-auto-resize.js');
+            enableAutoResize();
+            
             if (!isStudyMode()) {
                 console.log(`✅ Data fetch complete - marked ${volcano} as having data`);
             }
@@ -1009,6 +1018,11 @@ export async function startStreaming(event) {
         
         console.error('❌ Error:', error);
         console.error('Stack:', error.stack);
+        
+        // Re-enable auto-resize on error
+        const { enableAutoResize } = await import('./status-auto-resize.js');
+        enableAutoResize();
+        
         document.getElementById('status').className = 'status error';
         
         // Check if it's a fetch/network error and provide user-friendly message
@@ -1077,6 +1091,21 @@ async function initializePersonalMode() {
  */
 async function initializeDevMode() {
     console.log('🔧 DEV MODE: Tutorial runs every time (for testing)');
+    
+    // 🧹 CLEAR ALL STUDY/TUTORIAL/SESSION STATE - Start fresh every time
+    console.log('🧹 Clearing all study/tutorial/session state for fresh dev testing...');
+    const { STORAGE_KEYS } = await import('./study-workflow.js');
+    
+    // Clear all study workflow flags
+    Object.entries(STORAGE_KEYS).forEach(([name, key]) => {
+        localStorage.removeItem(key);
+    });
+    
+    // Also clear any legacy flags
+    localStorage.removeItem('study_has_seen_tutorial');
+    localStorage.removeItem('selectedMode'); // Clear mode override
+    
+    console.log('✅ State cleared - fresh slate for testing');
     
     // 🔥 ALWAYS run tutorial in DEV mode (no caching)
     console.log('🎓 Running tutorial (DEV mode always shows it)');
@@ -1421,12 +1450,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
-    // Hide simulate panel in Study Mode (surveys are controlled by workflow)
-    // But exclude TUTORIAL_END mode - it behaves differently (no initial modals)
+    // Simulate panel: hidden in Study Mode, shown in dev/personal modes
+    const simulatePanel = document.querySelector('.panel-simulate');
     if (isStudyMode()) {
-        const simulatePanel = document.querySelector('.panel-simulate');
+        // Already hidden by default in HTML, just log
         if (simulatePanel) {
-            simulatePanel.style.display = 'none';
             console.log('🎓 Production Mode: Simulate panel hidden (surveys controlled by workflow)');
         }
         
@@ -1434,6 +1462,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         // Modal system checks flags and decides whether to show overlay
         console.log('🎓 Production Mode: Modal system controls overlay (based on workflow flags)');
     } else {
+        // Show simulate panel in non-Study modes (Dev, Personal, TUTORIAL_END)
+        if (simulatePanel) {
+            simulatePanel.style.display = 'block';
+        }
+
         // Hide permanent overlay in non-Study modes (Dev, Personal, TUTORIAL_END)
         const permanentOverlay = document.getElementById('permanentOverlay');
         if (permanentOverlay) {
@@ -1488,8 +1521,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateParticipantIdDisplay();
     // Only log version info in dev/personal modes, not study mode
     if (!isStudyMode()) {
-        console.log('🌋 [0ms] volcano-audio v2.68 - Modal UX: Reduced spacing and enabled background visibility');
-        console.log('📌 [0ms] Git commit: v2.68 Modal UX: Reduced spacing and enabled background visibility');
+        console.log('🌋 [0ms] volcano-audio v2.69 - Tutorial: Fixed second feature/region flow, timing adjustments, removed redundant message');
+        console.log('📌 [0ms] Git commit: v2.69 Tutorial: Fixed second feature/region flow, timing adjustments, removed redundant message');
         console.log('🎨 [0ms] v2.67 Fix: Overlay was only fading out (300ms delay) instead of being immediately removed, leaving blank screen');
         console.log('🔧 [0ms] v2.67 Fix: When "Not yet" clicked, immediately set overlay display:none and show UI elements');
         console.log('⚡ [0ms] v2.65 Perf: More efficient frame skipping - only prevents duplicate work, doesn\'t skip legitimate frames');

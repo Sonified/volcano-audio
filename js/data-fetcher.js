@@ -460,7 +460,7 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
         State.setDataEndTime(endTime);
         
         // 🔥 Load saved regions now that time range is known
-        loadRegionsAfterDataFetch();
+        await loadRegionsAfterDataFetch();
         
         // Draw frequency axis with new metadata
         positionAxisCanvas();
@@ -1414,7 +1414,7 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
     State.setDataEndTime(endTime);
     
     // 🔥 Load saved regions now that time range is known
-    loadRegionsAfterDataFetch();
+    await loadRegionsAfterDataFetch();
     
     // Draw frequency axis with new metadata
     positionAxisCanvas();

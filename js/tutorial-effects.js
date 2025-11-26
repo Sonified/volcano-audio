@@ -612,6 +612,47 @@ export function removeSpectrogramGlow() {
 }
 
 /**
+ * Add pulse effect to waveform canvas
+ */
+export function addWaveformGlow() {
+    const waveformCanvas = document.getElementById('waveform');
+    if (waveformCanvas) {
+        waveformCanvas.classList.add('pulse');
+    }
+}
+
+/**
+ * Remove pulse effect from waveform canvas
+ */
+export function removeWaveformGlow() {
+    const waveformCanvas = document.getElementById('waveform');
+    if (waveformCanvas) {
+        waveformCanvas.classList.remove('pulse');
+    }
+}
+
+/**
+ * Add glow effect to speed slider with fade-in
+ */
+export function addSpeedSliderGlow() {
+    const speedSlider = document.getElementById('playbackSpeed');
+    if (speedSlider) {
+        // Add glow class
+        speedSlider.classList.add('speed-slider-glow');
+    }
+}
+
+/**
+ * Remove glow effect from speed slider
+ */
+export function removeSpeedSliderGlow() {
+    const speedSlider = document.getElementById('playbackSpeed');
+    if (speedSlider) {
+        speedSlider.classList.remove('speed-slider-glow');
+    }
+}
+
+/**
  * Add glow effect to regions panel with fade-in
  */
 export function addRegionsPanelGlow() {
@@ -645,6 +686,49 @@ export function removeRegionsPanelGlow() {
         // Remove glow class after fade completes
         setTimeout(() => {
             regionsPanel.classList.remove('regions-panel-glow', 'fading-out');
+        }, 500); // Match CSS transition duration
+    }
+}
+
+/**
+ * Add glow effect to notes field with fade-in
+ */
+export function addNotesFieldGlow(regionIndex, featureIndex) {
+    const notesField = document.getElementById(`notes-${regionIndex}-${featureIndex}`);
+    console.log('🎨 addNotesFieldGlow called:', { regionIndex, featureIndex, found: !!notesField });
+    if (notesField) {
+        console.log('🎨 Adding glow to notes field, current classes:', notesField.className);
+        // Add fading-in class first to start from opacity 0
+        notesField.classList.add('fading-in');
+        
+        // Force reflow to ensure the fade-in class is applied before adding glow
+        notesField.offsetHeight;
+        
+        // Add glow class which will fade in via CSS transition
+        notesField.classList.add('notes-field-glow');
+        console.log('🎨 After adding glow, classes:', notesField.className);
+        
+        // Remove fade-in class after transition completes
+        setTimeout(() => {
+            notesField.classList.remove('fading-in');
+        }, 500); // Match CSS transition duration
+    } else {
+        console.warn('⚠️ Notes field not found:', `notes-${regionIndex}-${featureIndex}`);
+    }
+}
+
+/**
+ * Remove glow effect from notes field with fade-out
+ */
+export function removeNotesFieldGlow(regionIndex, featureIndex) {
+    const notesField = document.getElementById(`notes-${regionIndex}-${featureIndex}`);
+    if (notesField) {
+        // Add fading-out class to trigger fade transition
+        notesField.classList.add('fading-out');
+        
+        // Remove glow class after fade completes
+        setTimeout(() => {
+            notesField.classList.remove('notes-field-glow', 'fading-out');
         }, 500); // Match CSS transition duration
     }
 }

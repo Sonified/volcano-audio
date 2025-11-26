@@ -2520,6 +2520,29 @@ export function submitParticipantSetup() {
     // The workflow is waiting for the modal to properly close through ModalManager.
 }
 
+/**
+ * Clear all pre-survey radio button selections
+ * Ensures fresh start for new sessions (e.g., after timeout)
+ */
+export function clearPreSurveyForm() {
+    const radioNames = ['preCalm', 'preEnergized', 'preConnected', 'preNervous', 'preFocused', 'preWonder'];
+    
+    radioNames.forEach(name => {
+        const radios = document.querySelectorAll(`input[name="${name}"]`);
+        radios.forEach(radio => {
+            radio.checked = false;
+        });
+    });
+    
+    // Disable submit button since no questions are answered
+    const preSurveySubmitBtn = document.querySelector('#preSurveyModal .modal-submit');
+    if (preSurveySubmitBtn) {
+        preSurveySubmitBtn.disabled = true;
+    }
+    
+    console.log('🧹 Pre-survey form cleared');
+}
+
 export function openPreSurveyModal() {
     // Close all other modals first
     closeAllModals();
@@ -2529,6 +2552,9 @@ export function openPreSurveyModal() {
         console.warn('⚠️ Pre-survey modal not found');
         return;
     }
+    
+    // Clear any previous selections for fresh start
+    clearPreSurveyForm();
     
     // Set title to default (Welcome Back modal handles the welcome back message)
     const modalTitle = preSurveyModal.querySelector('.modal-title');
