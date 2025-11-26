@@ -1020,9 +1020,10 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
                                             // Personal mode - enable immediately
                                             loopBtn.disabled = false;
                                         } else if (isStudyMode()) {
-                                            // Study mode - check if tutorial already seen
-                                            const hasSeenTutorial = localStorage.getItem('study_has_seen_tutorial') === 'true';
-                                            if (hasSeenTutorial) {
+                                            // Study mode - check if tutorial already seen (check both legacy and new flags)
+                                            const hasSeenTutorialLegacy = localStorage.getItem('study_has_seen_tutorial') === 'true';
+                                            const hasSeenTutorialNew = localStorage.getItem('study_tutorial_completed') === 'true';
+                                            if (hasSeenTutorialLegacy || hasSeenTutorialNew) {
                                                 loopBtn.disabled = false;
                                             }
                                             // If not seen, tutorial will enable it
@@ -1692,9 +1693,10 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
                 // Personal mode - enable immediately
                 loopBtn.disabled = false;
             } else if (isStudyMode()) {
-                // Study mode - check if tutorial already seen
-                const hasSeenTutorial = localStorage.getItem('study_has_seen_tutorial') === 'true';
-                if (hasSeenTutorial) {
+                // Study mode - check if tutorial already seen (check both legacy and new flags)
+                const hasSeenTutorialLegacy = localStorage.getItem('study_has_seen_tutorial') === 'true';
+                const hasSeenTutorialNew = localStorage.getItem('study_tutorial_completed') === 'true';
+                if (hasSeenTutorialLegacy || hasSeenTutorialNew) {
                     loopBtn.disabled = false;
                 }
                 // If not seen, tutorial will enable it
