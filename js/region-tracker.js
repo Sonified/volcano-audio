@@ -1761,18 +1761,20 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
  */
 function getFrequencyFromY(y, maxFreq, canvasHeight, scaleType, playbackRate = 1.0) {
     if (scaleType === 'logarithmic') {
-        // 🦋 LOGARITHMIC: The axis does NOT scale input freq by playbackRate!
-        // It calculates position at 1x, then stretches the POSITION
-        // So inverse: unstretched position → original frequency (no playback division!)
+        // 🦋 LOGARITHMIC: Must use SAME stretch factor as getYPositionForFrequencyScaled!
+        // Forward: heightFromBottom_scaled = heightFromBottom_1x * stretchFactor
+        // Inverse: heightFromBottom_1x = heightFromBottom_scaled / stretchFactor
         const minFreq = 0.1;
         const logMin = Math.log10(minFreq);
-        const logMax = Math.log10(maxFreq); // FIXED: use original Nyquist
+        const logMax = Math.log10(maxFreq);
+        const logRange = logMax - logMin;
 
-        // Calculate stretch factor
-        const effectiveNyquist = maxFreq * playbackRate;
-        const logMax_1x = Math.log10(maxFreq);
-        const logMax_scaled = Math.log10(effectiveNyquist);
-        const stretchFactor = logMax_scaled / logMax_1x;
+        // Calculate stretch factor using SAME formula as calculateStretchFactorForLog
+        const targetMaxFreq = maxFreq / playbackRate;
+        const logTargetMax = Math.log10(Math.max(targetMaxFreq, minFreq));
+        const targetLogRange = logTargetMax - logMin;
+        const fraction = targetLogRange / logRange;
+        const stretchFactor = 1 / fraction;
 
         // Reverse: heightFromBottom_scaled → heightFromBottom_1x
         const heightFromBottom_scaled = canvasHeight - y;
