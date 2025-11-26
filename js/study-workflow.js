@@ -802,6 +802,20 @@ export async function startStudyWorkflow() {
         }
     }
 
+    // 🛡️ CORRUPTED STATE FIX: BEGIN_ANALYSIS_CLICKED without session start time
+    // This can happen if session timed out but flags weren't properly cleared
+    // If BEGIN_ANALYSIS_CLICKED is true but no session exists, clear the corrupted flag
+    const beginAnalysisClicked = localStorage.getItem(STORAGE_KEYS.BEGIN_ANALYSIS_CLICKED_THIS_SESSION) === 'true';
+    const sessionStart = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION_START);
+    
+    if (beginAnalysisClicked && !sessionStart) {
+        console.warn('⚠️ CORRUPTED STATE: BEGIN_ANALYSIS_CLICKED is true but no session start time exists');
+        console.warn('   This indicates previous session ended without proper cleanup');
+        console.warn('   Clearing corrupted flag to unlock interface...');
+        localStorage.removeItem(STORAGE_KEYS.BEGIN_ANALYSIS_CLICKED_THIS_SESSION);
+        console.log('✅ Corrupted flag cleared - user can start fresh session');
+    }
+
     // 🔥 INCOMPLETE ONBOARDING: User saw setup/welcome but didn't start or complete tutorial
     // Instead of nuking everything, just mark tutorial as in progress and resume
     const hasPreSurvey = localStorage.getItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE) !== null;
@@ -1039,6 +1053,27 @@ export async function startStudyWorkflow() {
             // 🔒 Region creation remains DISABLED until user clicks "Begin Analysis"
             // (Same as first visit - must click Begin Analysis to enable region creation)
             console.log('🔒 Region creation DISABLED for returning visit (will be enabled after Begin Analysis)');
+            
+            // // 🛡️ SAFETY CHECK: Detect stale session flags
+            // // If BEGIN_ANALYSIS_CLICKED is set BUT no active session exists, flags are corrupted
+            // // This happens when session ended (timeout/crash) but flags weren't cleared
+            // const sessionStart = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION_START);
+            // const timeoutSessionId = localStorage.getItem(STORAGE_KEYS.TIMEOUT_SESSION_ID);
+            // const hasBegunAnalysis = hasBegunAnalysisThisSession();
+            // 
+            // if (hasBegunAnalysis && (!sessionStart || !timeoutSessionId)) {
+            //     console.warn('⚠️ STALE SESSION FLAGS DETECTED!');
+            //     console.warn('   BEGIN_ANALYSIS_CLICKED is set but no active session exists');
+            //     console.warn('   This indicates previous session ended without proper cleanup');
+            //     console.warn('   Clearing stale session flags to allow fresh start...');
+            //     
+            //     // Clear the corrupted session flags
+            //     localStorage.removeItem(STORAGE_KEYS.HAS_SEEN_WELCOME_BACK);
+            //     localStorage.removeItem(STORAGE_KEYS.BEGIN_ANALYSIS_CLICKED_THIS_SESSION);
+            //     localStorage.removeItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE);
+            //     
+            //     console.log('✅ Stale flags cleared - user will see Welcome Back modal');
+            // }
             
             // For returning visits, check if they've clicked "Begin Analysis" THIS SESSION
             // If so, transform button to "Complete" mode AND re-enable region creation (restore session state)

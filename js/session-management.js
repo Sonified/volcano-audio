@@ -374,6 +374,19 @@ export async function handleSessionTimeout() {
                         responses
                     ).catch(e => console.warn('Silent report failed:', e));
                 }
+                
+                // // 🔥 CRITICAL: Still need to clear session flags even without pre-survey data!
+                // // Otherwise user gets stuck with stale flags on next visit
+                // try {
+                //     localStorage.removeItem('study_has_seen_welcome_back');
+                //     localStorage.removeItem('study_pre_survey_completion_date');
+                //     localStorage.removeItem('study_begin_analysis_clicked_this_session');
+                //     localStorage.removeItem('study_current_session_start');
+                //     localStorage.removeItem('study_timeout_session_id');
+                //     console.log('🧹 Cleared session flags after timeout (no pre-survey case)');
+                // } catch (error) {
+                //     console.warn('⚠️ Could not clear session flags:', error);
+                // }
             }
         } else {
             console.warn('⚠️ No participant ID found - cannot submit timeout data');
