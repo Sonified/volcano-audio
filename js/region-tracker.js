@@ -1385,16 +1385,18 @@ export function handleWaveformClick(event, canvas) {
  */
 export function stopFrequencySelection() {
     // 🔍 DEBUG: Log state before stopping selection
-    console.log('🔴 [DEBUG] STOP_FREQUENCY_SELECTION CALLED:', {
-        wasSelectingFrequency: isSelectingFrequency,
-        hadCurrentSelection: !!currentFrequencySelection,
-        currentSelection: currentFrequencySelection,
-        documentHasFocus: document.hasFocus(),
-        windowHasFocus: document.visibilityState === 'visible'
-    });
+    if (!isStudyMode()) {
+        console.log('🔴 [DEBUG] STOP_FREQUENCY_SELECTION CALLED:', {
+            wasSelectingFrequency: isSelectingFrequency,
+            hadCurrentSelection: !!currentFrequencySelection,
+            currentSelection: currentFrequencySelection,
+            documentHasFocus: document.hasFocus(),
+            windowHasFocus: document.visibilityState === 'visible'
+        });
+    }
     
     if (!isSelectingFrequency) {
-        console.log('🔴 [DEBUG] Not in frequency selection mode - nothing to stop');
+        if (!isStudyMode()) console.log('🔴 [DEBUG] Not in frequency selection mode - nothing to stop');
         return;
     }
     
@@ -1404,7 +1406,7 @@ export function stopFrequencySelection() {
     isSelectingFrequency = false;
     currentFrequencySelection = null;
     
-    console.log('🔴 [DEBUG] Frequency selection stopped - canceling any active selection box');
+    if (!isStudyMode()) console.log('🔴 [DEBUG] Frequency selection stopped - canceling any active selection box');
     
     // Cancel any active selection box (remove red box stuck to mouse)
     cancelSpectrogramSelection();
@@ -1539,7 +1541,9 @@ export function startFrequencySelection(regionIndex, featureIndex) {
  * Called when user completes a box selection on spectrogram
  */
 export async function handleSpectrogramSelection(startY, endY, canvasHeight, startX, endX, canvasWidth) {
-    console.log('🟢 [DEBUG] HANDLE_SPECTROGRAM_SELECTION CALLED');
+    if (!isStudyMode()) {
+        console.log('🟢 [DEBUG] HANDLE_SPECTROGRAM_SELECTION CALLED');
+    }
 
     // 🎯 NEW ARCHITECTURE: Auto-determine which feature to fill in
     // Find the active region and either use incomplete feature or create new one
@@ -1575,17 +1579,18 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
 
     const regionIndex = activeRegionIndex;
 
-    console.log(`🎯 Auto-selected feature: region ${regionIndex + 1}, feature ${featureIndex + 1}`);
-    
-    console.log('🎯 ========== MOUSE UP: Feature Selection Complete ==========');
-    console.log('📍 Canvas coordinates (pixels):', {
-        startX: startX?.toFixed(1),
-        endX: endX?.toFixed(1),
-        startY: startY?.toFixed(1),
-        endY: endY?.toFixed(1),
-        canvasWidth,
-        canvasHeight
-    });
+    if (!isStudyMode()) {
+        console.log(`🎯 Auto-selected feature: region ${regionIndex + 1}, feature ${featureIndex + 1}`);
+        console.log('🎯 ========== MOUSE UP: Feature Selection Complete ==========');
+        console.log('📍 Canvas coordinates (pixels):', {
+            startX: startX?.toFixed(1),
+            endX: endX?.toFixed(1),
+            startY: startY?.toFixed(1),
+            endY: endY?.toFixed(1),
+            canvasWidth,
+            canvasHeight
+        });
+    }
     
     // Convert Y positions to frequencies (with playbackRate for accurate conversion!)
     const playbackRate = State.currentPlaybackRate || 1.0;
@@ -1597,15 +1602,17 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
     const lowFreq = getFrequencyFromY(Math.max(startY, endY), originalNyquist, canvasHeight, State.frequencyScale, playbackRate);
     const highFreq = getFrequencyFromY(Math.min(startY, endY), originalNyquist, canvasHeight, State.frequencyScale, playbackRate);
 
-    console.log('🎵 Converted to frequencies (Hz):', {
-        startY_device: Math.min(startY, endY).toFixed(1),
-        endY_device: Math.max(startY, endY).toFixed(1),
-        canvasHeight_device: canvasHeight,
-        lowFreq: lowFreq.toFixed(2),
-        highFreq: highFreq.toFixed(2),
-        playbackRate: playbackRate.toFixed(2),
-        frequencyScale: State.frequencyScale
-    });
+    if (!isStudyMode()) {
+        console.log('🎵 Converted to frequencies (Hz):', {
+            startY_device: Math.min(startY, endY).toFixed(1),
+            endY_device: Math.max(startY, endY).toFixed(1),
+            canvasHeight_device: canvasHeight,
+            lowFreq: lowFreq.toFixed(2),
+            highFreq: highFreq.toFixed(2),
+            playbackRate: playbackRate.toFixed(2),
+            frequencyScale: State.frequencyScale
+        });
+    }
     
     // Convert X positions to timestamps
     let startTime = null;
@@ -1619,11 +1626,13 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
             const startTimestamp = zoomState.sampleToRealTimestamp(startSample);
             const endTimestamp = zoomState.sampleToRealTimestamp(endSample);
             
-            console.log('🏛️ Converted to samples (eternal coordinates):', {
-                startSample: startSample.toLocaleString(),
-                endSample: endSample.toLocaleString(),
-                sampleRate: zoomState.sampleRate
-            });
+            if (!isStudyMode()) {
+                console.log('🏛️ Converted to samples (eternal coordinates):', {
+                    startSample: startSample.toLocaleString(),
+                    endSample: endSample.toLocaleString(),
+                    sampleRate: zoomState.sampleRate
+                });
+            }
             
             if (startTimestamp && endTimestamp) {
                 // Ensure start is before end
@@ -1633,10 +1642,12 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
                 startTime = new Date(actualStartMs).toISOString();
                 endTime = new Date(actualEndMs).toISOString();
                 
-                console.log('📅 Converted to timestamps:', {
-                    startTime,
-                    endTime
-                });
+                if (!isStudyMode()) {
+                    console.log('📅 Converted to timestamps:', {
+                        startTime,
+                        endTime
+                    });
+                }
             }
         } else {
             // Fallback to old behavior if zoom state not initialized
@@ -1674,15 +1685,17 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
             regions[regionIndex].features[featureIndex].endTime = endTime;
         }
         
-        console.log('💾 SAVED to feature data:', {
-            regionIndex,
-            featureIndex,
-            lowFreq: lowFreq.toFixed(2),
-            highFreq: highFreq.toFixed(2),
-            startTime,
-            endTime
-        });
-        console.log('🎯 ========== END Feature Selection ==========\n');
+        if (!isStudyMode()) {
+            console.log('💾 SAVED to feature data:', {
+                regionIndex,
+                featureIndex,
+                lowFreq: lowFreq.toFixed(2),
+                highFreq: highFreq.toFixed(2),
+                startTime,
+                endTime
+            });
+            console.log('🎯 ========== END Feature Selection ==========\n');
+        }
         
         setCurrentRegions(regions);
         
@@ -3488,13 +3501,15 @@ export function zoomToRegion(regionIndex) {
  * Zoom back out to full view
  */
 export function zoomToFull() {
-    console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomToFull() called');
-    console.log('🔍 [ZOOM_TO_FULL DEBUG] State.waitingForZoomOut:', State.waitingForZoomOut);
-    console.log('🔍 [ZOOM_TO_FULL DEBUG] State._zoomOutResolve exists:', !!State._zoomOutResolve);
+    if (!isStudyMode()) {
+        console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomToFull() called');
+        console.log('🔍 [ZOOM_TO_FULL DEBUG] State.waitingForZoomOut:', State.waitingForZoomOut);
+        console.log('🔍 [ZOOM_TO_FULL DEBUG] State._zoomOutResolve exists:', !!State._zoomOutResolve);
+    }
     
     // 🎓 Tutorial: Resolve promise if waiting for zoom out
     if (State.waitingForZoomOut && State._zoomOutResolve) {
-        console.log('🔍 [ZOOM_TO_FULL DEBUG] Resolving tutorial zoom out promise');
+        if (!isStudyMode()) console.log('🔍 [ZOOM_TO_FULL DEBUG] Resolving tutorial zoom out promise');
         State.setWaitingForZoomOut(false);
         const resolve = State._zoomOutResolve;
         State.setZoomOutResolve(null);
@@ -3502,11 +3517,11 @@ export function zoomToFull() {
     }
     
     if (!zoomState.isInitialized()) {
-        console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomState not initialized - returning early');
+        if (!isStudyMode()) console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomState not initialized - returning early');
         return;
     }
     
-    console.log('🔍 [ZOOM_TO_FULL DEBUG] Continuing with zoom out...');
+    if (!isStudyMode()) console.log('🔍 [ZOOM_TO_FULL DEBUG] Continuing with zoom out...');
     
     // console.log('🌍 Zooming to full view');
     // console.log('🔙 ZOOMING OUT TO FULL VIEW starting');
@@ -3568,10 +3583,12 @@ export function zoomToFull() {
     cacheZoomedSpectrogram();
 
     // 🔍 DIAGNOSTIC: Log canvas states BEFORE zoom-out starts
-    console.log(`🔍 ZOOM OUT START - Canvas states:`, {
-        infiniteCanvas: getInfiniteCanvasStatus ? getInfiniteCanvasStatus() : 'NO STATUS FUNCTION',
-        cachedFull: getCachedFullStatus ? getCachedFullStatus() : 'NO STATUS FUNCTION'
-    });
+    if (!isStudyMode()) {
+        console.log(`🔍 ZOOM OUT START - Canvas states:`, {
+            infiniteCanvas: getInfiniteCanvasStatus ? getInfiniteCanvasStatus() : 'NO STATUS FUNCTION',
+            cachedFull: getCachedFullStatus ? getCachedFullStatus() : 'NO STATUS FUNCTION'
+        });
+    }
 
     // 🙏 Timestamps as source of truth: Return viewport to full data range
     // No sample calculations - just restore the eternal timestamp boundaries
@@ -3686,7 +3703,7 @@ export function zoomToFull() {
         State.setCachedFullWaveformCanvas(null);
         
         // 🔍 Diagnostic: Track zoom out complete
-        console.log('✅ ZOOM OUT complete');
+        if (!isStudyMode()) console.log('✅ ZOOM OUT complete');
         
         // Set status message for full view (only if not in tutorial)
         if (!isTutorialActive()) {

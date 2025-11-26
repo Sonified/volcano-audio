@@ -758,7 +758,9 @@ export function clearCachedFullSpectrogram() {
  * Does NOT touch the current display - purely background update
  */
 export async function updateElasticFriendInBackground() {
-    console.log(`🏠 Updating elastic friend in background with ${State.frequencyScale} scale...`);
+    if (!isStudyMode()) {
+        console.log(`🏠 Updating elastic friend in background with ${State.frequencyScale} scale...`);
+    }
     const startTime = performance.now();
     
     try {
@@ -766,8 +768,10 @@ export async function updateElasticFriendInBackground() {
         // skipViewportUpdate=true so we don't touch the display
         await renderCompleteSpectrogram(true, true);
         
-        const elapsed = performance.now() - startTime;
-        console.log(`🏠 Elastic friend updated in background (${elapsed.toFixed(0)}ms) - ready for zoom out!`);
+        if (!isStudyMode()) {
+            const elapsed = performance.now() - startTime;
+            console.log(`🏠 Elastic friend updated in background (${elapsed.toFixed(0)}ms) - ready for zoom out!`);
+        }
         
     } catch (error) {
         console.error('❌ Error updating elastic friend in background:', error);
@@ -826,7 +830,7 @@ export function clearCachedZoomedSpectrogram() {
         cachedZoomedSpectrogramCanvas.width = 0;
         cachedZoomedSpectrogramCanvas.height = 0;
         cachedZoomedSpectrogramCanvas = null;
-        console.log('🧹 Cleared zoomed cache');
+        if (!isStudyMode()) console.log('🧹 Cleared zoomed cache');
     }
 }
 

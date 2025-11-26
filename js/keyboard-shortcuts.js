@@ -47,7 +47,7 @@ export function cleanupKeyboardShortcuts() {
  */
 function handleKeyboardShortcut(event) {
     // Debug: Log Escape key presses
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !isStudyMode()) {
         console.log('🔍 [ESCAPE DEBUG] handleKeyboardShortcut() called with Escape key');
         console.log('🔍 [ESCAPE DEBUG] event.target:', event.target);
         console.log('🔍 [ESCAPE DEBUG] event.target.tagName:', event.target.tagName);
@@ -203,25 +203,27 @@ function handleKeyboardShortcut(event) {
     
     // Escape key: Zoom out immediately (exiting feature selection mode as part of the same action)
     if (event.key === 'Escape') {
-        console.log('🔍 [ESCAPE DEBUG] Escape key pressed');
-        console.log('🔍 [ESCAPE DEBUG] isTypingInField:', isTypingInField);
-        console.log('🔍 [ESCAPE DEBUG] isInFrequencySelectionMode():', isInFrequencySelectionMode());
-        console.log('🔍 [ESCAPE DEBUG] zoomState.isInRegion():', zoomState.isInRegion());
-        console.log('🔍 [ESCAPE DEBUG] zoomState:', {
-            mode: zoomState.mode,
-            activeRegionId: zoomState.activeRegionId,
-            initialized: zoomState.isInitialized()
-        });
+        if (!isStudyMode()) {
+            console.log('🔍 [ESCAPE DEBUG] Escape key pressed');
+            console.log('🔍 [ESCAPE DEBUG] isTypingInField:', isTypingInField);
+            console.log('🔍 [ESCAPE DEBUG] isInFrequencySelectionMode():', isInFrequencySelectionMode());
+            console.log('🔍 [ESCAPE DEBUG] zoomState.isInRegion():', zoomState.isInRegion());
+            console.log('🔍 [ESCAPE DEBUG] zoomState:', {
+                mode: zoomState.mode,
+                activeRegionId: zoomState.activeRegionId,
+                initialized: zoomState.isInitialized()
+            });
+        }
 
         // If typing in a field, blur it first so Escape works
         if (isTypingInField) {
-            console.log('🔍 [ESCAPE DEBUG] Blurring active input/textarea');
+            if (!isStudyMode()) console.log('🔍 [ESCAPE DEBUG] Blurring active input/textarea');
             event.target.blur();
         }
 
         // Exit feature selection mode if active (as part of zoom out, not a separate step)
         if (isInFrequencySelectionMode()) {
-            console.log('🔍 [ESCAPE DEBUG] Exiting feature selection mode as part of zoom out');
+            if (!isStudyMode()) console.log('🔍 [ESCAPE DEBUG] Exiting feature selection mode as part of zoom out');
             stopFrequencySelection();
             // Don't return - continue to zoom out
         }

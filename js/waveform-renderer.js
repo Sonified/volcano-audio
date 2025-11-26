@@ -842,7 +842,9 @@ export function setupWaveformInteraction() {
         }
         
         if (State.scrubTargetPosition !== null) {
-            console.log(`🖱️ Mouse released - seeking to ${State.scrubTargetPosition.toFixed(2)}s`);
+            if (!isStudyMode()) {
+                console.log(`🖱️ Mouse released - seeking to ${State.scrubTargetPosition.toFixed(2)}s`);
+            }
             forceNextPlayheadLog = true; // Force log on next playhead draw (user interaction)
             
             let clampedPosition = State.scrubTargetPosition;
@@ -952,7 +954,7 @@ export function setupWaveformInteraction() {
             if (dragDistance > 3 && !State.isSelecting) {
                 State.setIsSelecting(true);
                 canvas.style.cursor = 'col-resize';
-                console.log('📏 Selection drag detected');
+                if (!isStudyMode()) console.log('📏 Selection drag detected');
                 
                 // 🏛️ Only clear active region if NOT inside a region (outside the temple)
                 // Inside the temple, selections are within sacred walls, flag stays up

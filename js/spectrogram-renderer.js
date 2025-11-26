@@ -495,7 +495,7 @@ export async function changeFrequencyScale() {
                     if (playbackWasActive) {
                         startPlaybackIndicator();
                     }
-                    console.log('✅ Region scale transition complete (no fade)');
+                    if (!isStudyMode()) console.log('✅ Region scale transition complete (no fade)');
                     return;
                 }
 
@@ -515,7 +515,7 @@ export async function changeFrequencyScale() {
                     console.warn('⚠️ getSpectrogramViewport returned canvas with no visible content (all black)');
                 }
 
-                console.log('✅ Got new spectrogram viewport - starting crossfade');
+                if (!isStudyMode()) console.log('✅ Got new spectrogram viewport - starting crossfade');
                 
                 // 🎨 Crossfade old → new (300ms)
                 const fadeDuration = 300;
@@ -577,11 +577,11 @@ export async function changeFrequencyScale() {
                             startPlaybackIndicator();
                         }
 
-                        console.log('✅ Region scale transition complete (with fade)');
+                        if (!isStudyMode()) console.log('✅ Region scale transition complete (with fade)');
                         
                         // 🏠 PROACTIVE FIX: Re-render full spectrogram in background
                         // So elastic friend is ready with new frequency scale when user zooms out
-                        console.log('🏠 Starting background render of full spectrogram for elastic friend...');
+                        if (!isStudyMode()) console.log('🏠 Starting background render of full spectrogram for elastic friend...');
                         updateElasticFriendInBackground();
                     }
                 };
@@ -894,12 +894,14 @@ export function setupSpectrogramSelection() {
 
     canvas.addEventListener('mousedown', (e) => {
         // 🔍 DEBUG: Log zoom state when clicking on canvas
-        console.log('🖱️ [MOUSEDOWN] Canvas clicked - checking zoom state:', {
-            zoomStateInitialized: zoomState.isInitialized(),
-            isInRegion: zoomState.isInitialized() ? zoomState.isInRegion() : 'N/A (not initialized)',
-            zoomMode: zoomState.isInitialized() ? zoomState.mode : 'N/A',
-            activeRegionId: zoomState.isInitialized() ? zoomState.activeRegionId : 'N/A'
-        });
+        if (!isStudyMode()) {
+            console.log('🖱️ [MOUSEDOWN] Canvas clicked - checking zoom state:', {
+                zoomStateInitialized: zoomState.isInitialized(),
+                isInRegion: zoomState.isInitialized() ? zoomState.isInRegion() : 'N/A (not initialized)',
+                zoomMode: zoomState.isInitialized() ? zoomState.mode : 'N/A',
+                activeRegionId: zoomState.isInitialized() ? zoomState.activeRegionId : 'N/A'
+            });
+        }
         
         // 🎯 Check if region creation is enabled (requires "Begin Analysis" to be pressed)
         if (!State.isRegionCreationEnabled()) {
@@ -1269,7 +1271,7 @@ export function cancelSpectrogramSelection() {
         for (const box of completedSelectionBoxes) {
             drawSavedBox(spectrogramOverlayCtx, box);
         }
-        console.log(`🧹 Canceled current drag, kept ${completedSelectionBoxes.length} completed boxes`);
+        if (!isStudyMode()) console.log(`🧹 Canceled current drag, kept ${completedSelectionBoxes.length} completed boxes`);
     }
     
     // DEPRECATED: Legacy DOM box cleanup (kept for transition period)
