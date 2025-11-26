@@ -3373,7 +3373,11 @@ export async function attemptSubmission(fromWorkflow = false) {
                 activityLevel: responses.activityLevel || null
             },
             
-            submissionTimestamp: new Date().toISOString()
+            submissionTimestamp: new Date().toISOString(),
+            
+            // 🚨 LOG FORMULA FIX (2025-11-25): If true, frequency data in log mode is reliable
+            // See: docs/LOG_FREQUENCY_CONVERSION_CHANGE.md
+            usesCorrectedLogFormula: true
         };
         
         // 📋 JSON_data field: Interface interaction data + survey answers backup

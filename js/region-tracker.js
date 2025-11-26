@@ -1758,6 +1758,15 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
  * Convert Y position to frequency based on scale type
  * 🔗 INVERSE of getYPositionForFrequencyScaled() from axis renderer
  * This MUST produce frequencies in the ORIGINAL scale (not stretched by playback)
+ * 
+ * 🚨 LOGARITHMIC FORMULA FIX (2025-11-25):
+ * Prior to this fix, the logarithmic stretch factor was calculated incorrectly:
+ *   OLD (BROKEN): stretchFactor = log10(maxFreq * playbackRate) / log10(maxFreq)
+ *   NEW (CORRECT): Uses same formula as calculateStretchFactorForLog() in axis renderer
+ * 
+ * This caused frequency values to be saved incorrectly when playbackRate != 1.
+ * Submissions after this fix have usesCorrectedLogFormula: true in the JSON dump.
+ * See: docs/LOG_FREQUENCY_CONVERSION_CHANGE.md
  */
 function getFrequencyFromY(y, maxFreq, canvasHeight, scaleType, playbackRate = 1.0) {
     if (scaleType === 'logarithmic') {

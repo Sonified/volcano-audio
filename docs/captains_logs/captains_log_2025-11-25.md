@@ -63,3 +63,51 @@ The main study functionality was working perfectly - Leif was receiving complete
 6. **Fixed post-tutorial zoom out message:** Now shows "Press the Complete button when you are ready to share your findings."
 
 **Pushed:** v2.69 Tutorial: Fixed second feature/region flow, timing adjustments, removed redundant message
+
+---
+
+## Critical Bug Fix: Logarithmic Frequency Conversion
+
+### Discovery
+While testing feature box drawing in logarithmic mode, discovered that boxes would "jump" to a different location after being drawn - but ONLY when playback speed was not 1x.
+
+### Root Cause
+The Y-to-frequency conversion function (`getFrequencyFromY` in `region-tracker.js`) was using a DIFFERENT stretch factor formula than the frequency-to-Y display function (`getYPositionForFrequencyScaled` in `spectrogram-axis-renderer.js`).
+
+**OLD (broken) formula:**
+```javascript
+stretchFactor = log10(maxFreq * playbackRate) / log10(maxFreq)
+```
+
+**NEW (correct) formula:**
+```javascript
+targetMaxFreq = maxFreq / playbackRate  // DIVISION not multiplication!
+fraction = (log10(targetMaxFreq) - log10(0.1)) / (log10(maxFreq) - log10(0.1))
+stretchFactor = 1 / fraction
+```
+
+At playbackRate = 1.0, both formulas give 1.0 (no error). But at other speeds they diverge:
+- 0.1x playback: 43.6% formula difference
+- 0.5x playback: 8.5% formula difference  
+- 2.0x playback: 4.6% formula difference
+
+### Impact on Saved Data
+**Features saved in logarithmic mode at non-1x playback speeds have incorrect `lowFreq` and `highFreq` values.** The stored frequencies don't match what the user actually selected.
+
+### The Fix
+1. Fixed `getFrequencyFromY()` to use the same stretch factor calculation as `calculateStretchFactorForLog()`
+2. Added `usesCorrectedLogFormula: true` flag to all newly saved features for data provenance
+3. Created comprehensive documentation with data correction formula
+
+### Files Modified
+- `js/region-tracker.js` - Fixed logarithmic case + added flag
+- `docs/LOG_FREQUENCY_CONVERSION_CHANGE.md` - Full documentation with Python/JS correction formulas
+- `tests/test_log_frequency_correction.py` - Validates correction formula works for 0.1x to 15x playback
+
+### Commits
+1. `15687c3` - "Fix logarithmic mode box jump bug - use matching stretch factor formula"
+2. (pending) - Documentation, flag, and test additions
+
+**Status:** ✅ Fixed  
+**Documentation:** ✅ Complete with data correction formulas  
+**Tests:** ✅ All passing for 0.1x to 15x playback range
