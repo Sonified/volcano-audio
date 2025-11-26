@@ -100,7 +100,6 @@ export const STORAGE_KEYS = {
     WEEKLY_SESSION_COUNT: 'study_weekly_session_count',
     TIMEOUT_SESSION_ID: 'study_timeout_session_id', // Ties timeout to specific session
     WEEK_START_DATE: 'study_week_start_date',
-    PRE_SURVEY_COMPLETION_DATE: 'study_pre_survey_completion_date',
     TOTAL_SESSIONS_STARTED: 'study_total_sessions_started',
     TOTAL_SESSIONS_COMPLETED: 'study_total_sessions_completed',
     TOTAL_SESSION_TIME: 'study_total_session_time', // in milliseconds
@@ -451,9 +450,8 @@ export function closeSession(completedAllSurveys = false, submittedToQualtrics =
         // Returning users get "Welcome Back" modal automatically (HAS_SEEN_WELCOME_BACK cleared)
         try {
             localStorage.removeItem(STORAGE_KEYS.HAS_SEEN_WELCOME_BACK);
-            localStorage.removeItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE);
             localStorage.removeItem(STORAGE_KEYS.BEGIN_ANALYSIS_CLICKED_THIS_SESSION);
-            console.log('🧹 Cleared session flags for next session (welcome back, pre-survey, begin analysis, timeout ID)');
+            console.log('🧹 Cleared session flags for next session (welcome back, begin analysis, timeout ID)');
         } catch (error) {
             console.error('❌ Error clearing session flags:', error);
         }
@@ -692,31 +690,36 @@ if (typeof window !== 'undefined') {
 // ═══════════════════════════════════════════════════════════
 
 /**
- * Get today's date as YYYY-MM-DD string
+ * Check if user should see pre-survey modal
+ * Simple session-based check - no date tracking needed
+ * @returns {boolean} - true if pre-survey should be shown
  */
-function getTodayDateString() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-/**
- * Check if pre-survey was completed today
- */
-function hasCompletedPreSurveyToday() {
-    const completionDate = localStorage.getItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE);
-    if (!completionDate) return false;
-    return completionDate === getTodayDateString();
-}
-
-/**
- * Mark pre-survey as completed today
- */
-export function markPreSurveyCompletedToday() {
-    localStorage.setItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE, getTodayDateString());
-    console.log(`✅ Pre-survey marked as completed today (${getTodayDateString()})`);
+function shouldShowPreSurvey() {
+    // Check 1: Do they have an active session?
+    const sessionStart = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION_START);
+    if (!sessionStart) {
+        console.log('📊 shouldShowPreSurvey: No active session → SHOW');
+        return true; // No session = need pre-survey
+    }
+    
+    // Check 2: Does their session have pre-survey data?
+    const participantId = getParticipantId();
+    if (!participantId) {
+        console.log('📊 shouldShowPreSurvey: No participant ID → SHOW');
+        return true; // Can't check without ID, show to be safe
+    }
+    
+    const responses = getSessionResponses(participantId);
+    
+    // If session exists but no pre-survey data → show pre-survey
+    if (!responses || !responses.pre) {
+        console.log('📊 shouldShowPreSurvey: Session exists but no pre-survey data → SHOW');
+        return true;
+    }
+    
+    // Has active session with pre-survey → skip
+    console.log('📊 shouldShowPreSurvey: Session has pre-survey → SKIP');
+    return false;
 }
 
 /**
@@ -729,8 +732,7 @@ async function clearSessionForNewDay(participantId) {
     clearSession(participantId);
     console.log('🗑️ Cleared session data for new day');
     
-    // Also clear the pre-survey completion date (will be set again when they complete it)
-    localStorage.removeItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE);
+    // Note: No date flag cleanup needed - session data is the source of truth
 }
 
 /**
@@ -818,12 +820,11 @@ export async function startStudyWorkflow() {
 
     // 🔥 INCOMPLETE ONBOARDING: User saw setup/welcome but didn't start or complete tutorial
     // Instead of nuking everything, just mark tutorial as in progress and resume
-    const hasPreSurvey = localStorage.getItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE) !== null;
     const isInTutorial = isTutorialInProgress();
 
     if (hasSeenParticipantSetup() && !tutorialCompleted() && !isInTutorial) {
         console.log('🔄 INCOMPLETE ONBOARDING: User saw setup but tutorial not started/completed');
-        console.log(`   Has pre-survey: ${hasPreSurvey}, Tutorial in progress: ${isInTutorial}`);
+        console.log(`   Tutorial in progress: ${isInTutorial}`);
         console.log('🎓 Marking tutorial as in progress and resuming...');
 
         // Mark tutorial as in progress so we resume properly
@@ -926,10 +927,6 @@ export async function startStudyWorkflow() {
         localStorage.setItem(STORAGE_KEYS.BEGIN_ANALYSIS_CLICKED_THIS_SESSION, 'true');
         console.log('   ✅ Set: BEGIN_ANALYSIS_CLICKED_THIS_SESSION = true (volcano locked, button shows Complete)');
         
-        // Set pre-survey completion date to today (already completed in this session)
-        localStorage.setItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE, getTodayDateString());
-        console.log('   ✅ Set: PRE_SURVEY_COMPLETION_DATE = today (skip Welcome Back modal)');
-        
         // Enable region creation (user already clicked Begin Analysis before refresh)
         const { setRegionCreationEnabled } = await import('./audio-state.js');
         setRegionCreationEnabled(true);
@@ -957,7 +954,6 @@ export async function startStudyWorkflow() {
         // Clear SESSION-level flags only (NOT persistent onboarding/tutorial flags)
         const sessionFlagsToClear = [
             STORAGE_KEYS.HAS_SEEN_WELCOME_BACK,  // SESSION flag - clear so Welcome Back shows
-            STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE,
             STORAGE_KEYS.CURRENT_SESSION_START,
             STORAGE_KEYS.BEGIN_ANALYSIS_CLICKED_THIS_SESSION  // SESSION flag - clear so volcano unlocked
         ];
@@ -1166,43 +1162,22 @@ export async function startStudyWorkflow() {
                 console.log('✅ Previous session was submitted - starting NEW session for today');
                 console.log('🔄 Clearing submitted session and starting fresh');
                 // Clear the submitted session - user is starting a new daily session
-                // This also clears the pre-survey completion date
                 await clearSessionForNewDay(participantId);
                 console.log('📊 Starting new session - showing Pre-Survey');
                 // Continue to show pre-survey below (don't return early)
             }
             
-            // Check if pre-survey was completed today (for current in-progress session)
-            const completedToday = hasCompletedPreSurveyToday();
-            console.log('🔍 Pre-survey completion check:', {
-                completedToday,
-                completionDate: localStorage.getItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE),
-                today: getTodayDateString()
-            });
-            
-            if (completedToday) {
-                // Only skip pre-survey if session is still in-progress (not submitted)
-                // If session was just cleared above, this will be null and we'll show pre-survey
-                const currentSessionState = getSessionState(participantId);
-                console.log('🔍 Current session state after checks:', {
-                    exists: !!currentSessionState,
-                    status: currentSessionState?.status
-                });
-                
-                if (currentSessionState && currentSessionState.status === 'in-progress') {
-                    console.log('📊 Pre-Survey already completed today for current session - skipping');
-                    console.log('✅ User can proceed directly to experience');
-                    // Button was already transformed above in the returning visit section
-                    // Hide modal overlay (user is mid-session, no modals needed)
-                    const { fadeOutOverlay } = await import('./ui-controls.js');
-                    fadeOutOverlay();
-                    // Don't show pre-survey modal - user can explore
-                    return; // Exit early - user can explore
-                } else {
-                    // Session was cleared, doesn't exist, or was submitted - show pre-survey
-                    console.log('📊 Pre-Survey completion date exists but session was cleared/submitted - showing Pre-Survey');
-                    console.log('   Reason: Session state is', currentSessionState ? `status="${currentSessionState.status}"` : 'null');
-                }
+            // Simple check: Should we show pre-survey?
+            // This checks: Does user have an active session with pre-survey data?
+            if (!shouldShowPreSurvey()) {
+                console.log('📊 Pre-Survey already completed for current session - skipping');
+                console.log('✅ User can proceed directly to experience');
+                // Button was already transformed above in the returning visit section
+                // Hide modal overlay (user is mid-session, no modals needed)
+                const { fadeOutOverlay } = await import('./ui-controls.js');
+                fadeOutOverlay();
+                // Don't show pre-survey modal - user can explore
+                return; // Exit early - user can explore
             }
             
             // Check if they've already seen Welcome Back AND clicked Begin Analysis
@@ -1210,14 +1185,6 @@ export async function startStudyWorkflow() {
             if (!hasBegunAnalysisThisSession()) {
                 console.log('🔄 Begin Analysis not clicked - clearing Welcome Back flag to show modal again');
                 localStorage.removeItem(STORAGE_KEYS.HAS_SEEN_WELCOME_BACK);
-            }
-            
-            // Check if pre-survey was completed on a different day
-            const lastCompletionDate = localStorage.getItem(STORAGE_KEYS.PRE_SURVEY_COMPLETION_DATE);
-            if (lastCompletionDate && lastCompletionDate !== getTodayDateString()) {
-                console.log(`📅 Pre-Survey was completed on ${lastCompletionDate}, but today is ${getTodayDateString()} - clearing session`);
-                // Clear the session for the new day
-                await clearSessionForNewDay(participantId);
             }
             
             // Show Welcome Back if they haven't clicked Begin Analysis yet (even if they've seen it before reload)

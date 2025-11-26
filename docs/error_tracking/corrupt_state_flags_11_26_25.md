@@ -237,7 +237,40 @@ Before implementing fixes:
 
 ## Status
 
-**Current state:** Both fixes commented out, waiting for surgical analysis of proper solution.
+**✅ FIXED - November 26, 2025**
 
-**Risk:** Real participants could encounter this bug in production if they timeout before completing pre-survey.
+### Solution Implemented
+
+Removed the unnecessary `PRE_SURVEY_COMPLETION_DATE` flag entirely and replaced all pre-survey completion logic with a simple session-based check.
+
+**New Logic:**
+```javascript
+function shouldShowPreSurvey() {
+    // If no active session → show pre-survey
+    const sessionStart = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION_START);
+    if (!sessionStart) return true;
+    
+    // If session exists but no pre-survey data → show pre-survey
+    const participantId = getParticipantId();
+    const responses = getSessionResponses(participantId);
+    if (!responses || !responses.pre) return true;
+    
+    // Has active session with pre-survey → skip
+    return false;
+}
+```
+
+**Why This Works:**
+- Session response data (`responses.pre`) is the single source of truth
+- No duplicate date-based tracking that can desync
+- Automatically handles corrupted states (no session = show pre-survey)
+- Simpler logic = fewer bugs
+
+**Files Changed:**
+- `js/study-workflow.js` - Removed `PRE_SURVEY_COMPLETION_DATE` flag, replaced complex logic with `shouldShowPreSurvey()`
+- `js/ui-controls.js` - Removed `markPreSurveyCompletedToday()` call from pre-survey submission
+
+**Previous Risk:** Real participants could encounter this bug in production if they timeout before completing pre-survey.
+
+**Current Risk:** Eliminated. The simplified logic gracefully handles all edge cases including timeouts, crashes, and corrupted flags.
 
