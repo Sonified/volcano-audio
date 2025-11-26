@@ -1521,6 +1521,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateParticipantIdDisplay();
     // Only log version info in dev/personal modes, not study mode
     if (!isStudyMode()) {
+        console.log('🌋 [0ms] volcano-audio v2.70 - Fix: Session timeout activity tracking + Frequency scale zoom-out propagation');
+        console.log('📌 [0ms] Git commit: v2.70 Fix: Session timeout respects user activity, frequency scale propagates on zoom out');
         console.log('🌋 [0ms] volcano-audio v2.69 - Tutorial: Fixed second feature/region flow, timing adjustments, removed redundant message');
         console.log('📌 [0ms] Git commit: v2.69 Tutorial: Fixed second feature/region flow, timing adjustments, removed redundant message');
         console.log('🎨 [0ms] v2.67 Fix: Overlay was only fading out (300ms delay) instead of being immediately removed, leaving blank screen');

@@ -40,6 +40,7 @@ let workerPool = null;
 
 // 🏠 THE ELASTIC FRIEND - our source of truth during transitions
 let cachedFullSpectrogramCanvas = null;
+let cachedFullFrequencyScale = null;  // Track which scale the elastic friend was rendered with
 
 // 🔬 High-res zoomed version (rendered in background, crossfaded when ready)
 let cachedZoomedSpectrogramCanvas = null;
@@ -247,11 +248,13 @@ function hslToRgb(h, s, l) {
 /**
  * Main function to render the complete spectrogram (FULL VIEW)
  * This becomes our ELASTIC FRIEND 🏠
+ * @param {boolean} skipViewportUpdate - Don't update the display canvas
+ * @param {boolean} forceFullView - Bypass region check (for background elastic friend update)
  */
-export async function renderCompleteSpectrogram(skipViewportUpdate = false) {
+export async function renderCompleteSpectrogram(skipViewportUpdate = false, forceFullView = false) {
     // Only log in dev/personal modes, not study mode
     if (!isStudyMode()) {
-        console.log(`🎨 [spectrogram-complete-renderer.js] renderCompleteSpectrogram CALLED: skipViewportUpdate=${skipViewportUpdate}`);
+        console.log(`🎨 [spectrogram-complete-renderer.js] renderCompleteSpectrogram CALLED: skipViewportUpdate=${skipViewportUpdate}, forceFullView=${forceFullView}`);
     }
     // console.trace('📍 Call stack:');
     
@@ -269,8 +272,8 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false) {
         return;
     }
     
-    // If inside a region, render that instead
-    if (zoomState.isInRegion()) {
+    // If inside a region, render that instead (unless forceFullView is set)
+    if (!forceFullView && zoomState.isInRegion()) {
         const regionRange = zoomState.getRegionRange();
         if (!isStudyMode()) {
             console.log(`🔍 Inside temple - rendering region instead`);
@@ -282,7 +285,8 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false) {
         return await renderCompleteSpectrogramForRegion(startSeconds, endSeconds);
     }
     
-    if (completeSpectrogramRendered) {
+    // Skip "already rendered" check when forcing full view update
+    if (!forceFullView && completeSpectrogramRendered) {
         if (!isStudyMode()) {
             console.log('✅ Complete spectrogram already rendered');
         }
@@ -486,6 +490,7 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false) {
         
         // 🏠 STORE AS ELASTIC FRIEND (our source of truth for transitions!)
         cachedFullSpectrogramCanvas = tempCanvas;
+        cachedFullFrequencyScale = State.frequencyScale;  // Remember which scale we rendered with
         
         // logInfiniteCanvasState('renderCompleteSpectrogram COMPLETE - infinite canvas created');
         
@@ -745,6 +750,28 @@ export function clearCachedFullSpectrogram() {
     // Don't clear during transitions - we need it!
     // Only clear on full cleanup
     // console.log('🏠 Keeping elastic friend around');
+}
+
+/**
+ * 🏠 Update elastic friend in background (after frequency scale change while zoomed in)
+ * Re-renders the full spectrogram so it's ready with the new scale when user zooms out
+ * Does NOT touch the current display - purely background update
+ */
+export async function updateElasticFriendInBackground() {
+    console.log(`🏠 Updating elastic friend in background with ${State.frequencyScale} scale...`);
+    const startTime = performance.now();
+    
+    try {
+        // Use existing render function with forceFullView=true to bypass region check
+        // skipViewportUpdate=true so we don't touch the display
+        await renderCompleteSpectrogram(true, true);
+        
+        const elapsed = performance.now() - startTime;
+        console.log(`🏠 Elastic friend updated in background (${elapsed.toFixed(0)}ms) - ready for zoom out!`);
+        
+    } catch (error) {
+        console.error('❌ Error updating elastic friend in background:', error);
+    }
 }
 
 // Track frequency scale when caching so we can detect mismatches

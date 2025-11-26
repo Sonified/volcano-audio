@@ -106,6 +106,7 @@ export const STORAGE_KEYS = {
     TOTAL_SESSION_TIME: 'study_total_session_time', // in milliseconds
     SESSION_HISTORY: 'study_session_history', // JSON array of session objects
     CURRENT_SESSION_START: 'study_current_session_start', // timestamp of current session
+    LAST_ACTIVITY_TIME: 'study_last_activity_time', // 🔥 Persisted activity time for reload timeout check
     TOTAL_REGIONS_IDENTIFIED: 'study_total_regions_identified', // cumulative across all sessions
     TOTAL_FEATURES_IDENTIFIED: 'study_total_features_identified', // cumulative across all sessions
     SESSION_COMPLETION_TRACKER: 'study_session_completion_tracker', // tracks which specific sessions are complete
@@ -779,12 +780,21 @@ export async function startStudyWorkflow() {
                 console.log(`✅ Timeout session match: ${timeoutSessionId} - checking elapsed time`);
                 
                 const now = Date.now();
-                const lastActivityTime = new Date(sessionStartTime).getTime();
+                
+                // 🔥 FIX: Use persisted LAST ACTIVITY time, not session START time!
+                // Session start time was the bug - it would timeout even if user was active
+                const persistedActivityTime = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY_TIME);
+                const lastActivityTime = persistedActivityTime 
+                    ? parseInt(persistedActivityTime) 
+                    : new Date(sessionStartTime).getTime(); // Fallback to session start only if no activity recorded
+                
                 const inactiveTime = now - lastActivityTime;
                 const INACTIVE_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
                 
+                console.log(`⏱️ Timeout check: last activity ${(inactiveTime / 1000 / 60).toFixed(1)} minutes ago`);
+                
                 if (inactiveTime >= INACTIVE_TIMEOUT_MS) {
-                    console.log(`⏰ Session timeout detected: ${(inactiveTime / 1000 / 60).toFixed(1)} minutes elapsed`);
+                    console.log(`⏰ Session timeout detected: ${(inactiveTime / 1000 / 60).toFixed(1)} minutes of inactivity`);
                     const { handleSessionTimeout } = await import('./session-management.js');
                     handleSessionTimeout();
                     return; // Exit - timeout modal will handle continuation

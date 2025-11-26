@@ -111,3 +111,86 @@ At playbackRate = 1.0, both formulas give 1.0 (no error). But at other speeds th
 **Status:** ✅ Fixed  
 **Documentation:** ✅ Complete with data correction formulas  
 **Tests:** ✅ All passing for 0.1x to 15x playback range
+
+---
+
+## Bug Fix: Frequency Scale Not Propagating on Zoom Out
+
+### Discovery
+When changing the frequency scale (linear/sqrt/log) while zoomed into a region, the zoomed-in view would update correctly. However, when zooming out to full view, the main canvas would still show the OLD frequency scale.
+
+### Root Cause
+The `cachedFullSpectrogramCanvas` (nicknamed the "elastic friend") is cached when the full spectrogram is first rendered. When zooming out, `restoreInfiniteCanvasFromCache()` restores from this cached canvas. 
+
+**The problem:** When frequency scale changed while zoomed in, only the region spectrogram was re-rendered. The cached full spectrogram was never updated, so zooming out would restore the stale cache with the old frequency scale.
+
+### The Fix
+**Proactive approach:** Re-render the full spectrogram in the background immediately after the region frequency scale change completes.
+
+**Changes:**
+1. Added `cachedFullFrequencyScale` variable to track which scale the elastic friend was rendered with
+2. Added `forceFullView` parameter to `renderCompleteSpectrogram()` - bypasses region check and "already rendered" check
+3. Created `updateElasticFriendInBackground()` - calls `renderCompleteSpectrogram(true, true)` after region scale change
+4. After region frequency scale fade completes, kicks off background re-render of full spectrogram
+
+**Files Modified:**
+- `js/spectrogram-complete-renderer.js` - Added `forceFullView` param, tracking variable, and background update function
+- `js/spectrogram-renderer.js` - Call `updateElasticFriendInBackground()` after region scale transition completes
+
+### Flow After Fix
+```
+Change frequency scale (while zoomed in)
+    ↓
+Region re-renders + fades in (visible to user)
+    ↓
+Background: Full spectrogram re-renders (invisible)
+    ↓
+Elastic friend updated with new scale ✅
+    ↓
+User zooms out → elastic friend has correct scale! 🎯
+```
+
+**Status:** ✅ Fixed  
+**Version:** v2.70
+
+---
+
+## Critical Bug Fix: Session Timeout Ignoring User Activity
+
+### Discovery
+User was actively interacting with the display for 21 minutes, refreshed the page, and immediately got the timeout screen. Console showed:
+```
+⏰ Session timeout detected: 21.1 minutes elapsed
+```
+
+### Root Cause
+The on-reload timeout check in `study-workflow.js` was comparing against `sessionStartTime` instead of actual last activity time:
+
+```javascript
+// BROKEN - using session START time, not last ACTIVITY time!
+const lastActivityTime = new Date(sessionStartTime).getTime();
+const inactiveTime = now - lastActivityTime;
+```
+
+Meanwhile, `session-management.js` was correctly tracking activity in memory via mousemove/click/keydown events, BUT that in-memory `lastActivityTime` was never persisted to localStorage. On page refresh, the in-memory value was lost, and the reload check fell back to session start time.
+
+### The Fix
+
+1. **Added `LAST_ACTIVITY_TIME` storage key** - Persists last activity timestamp to localStorage
+2. **Throttled activity detection to 1 second** - Prevents running localStorage.setItem() hundreds of times per second on mousemove
+3. **Fixed reload check to use persisted activity time** - Now reads `LAST_ACTIVITY_TIME` instead of `CURRENT_SESSION_START`
+4. **Added inactivity debug logging** - Console shows `⏱️ Inactivity: Xm Ys` every minute
+
+**Files Modified:**
+- `js/session-management.js` - Activity throttling + localStorage persistence
+- `js/study-workflow.js` - Added storage key + fixed reload check
+
+### How Activity Tracking Now Works
+1. User moves mouse/clicks/types → `resetActivityTimer()` called
+2. Throttle check: Has 1 second passed since last check? No → return early
+3. Yes → Update in-memory time + write to localStorage
+4. On page reload → Read persisted activity time, not session start
+5. Debug log every 60s: `⏱️ Inactivity: 0m 45s`
+
+**Status:** ✅ Fixed  
+**Version:** v2.70

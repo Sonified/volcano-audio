@@ -11,12 +11,14 @@ import { reportSessionStateInconsistency } from './silent-error-reporter.js';
 // ===== SESSION TIMEOUT MANAGEMENT =====
 
 let lastActivityTime = Date.now();
+let lastActivityCheck = 0; // Throttle activity detection (not every mousemove!)
 let timeoutWarningShown = false;
 let timeoutCheckInterval = null;
 let countdownInterval = null;
 
 const INACTIVE_WARNING_MS = 10 * 60 * 1000;  // 10 minutes
 const INACTIVE_TIMEOUT_MS = 20 * 60 * 1000;  // 20 minutes
+const ACTIVITY_THROTTLE_MS = 1000;           // Only check activity once per second
 
 /**
  * Set last activity time (for testing purposes)
@@ -25,15 +27,39 @@ const INACTIVE_TIMEOUT_MS = 20 * 60 * 1000;  // 20 minutes
 export function setLastActivityTime(timestamp) {
     lastActivityTime = timestamp;
     timeoutWarningShown = false;
+    
+    // 🔥 Persist to localStorage for reload timeout check
+    try {
+        localStorage.setItem('study_last_activity_time', timestamp.toString());
+    } catch (e) {
+        // Ignore localStorage errors
+    }
 }
 
 /**
  * Reset activity timer (call on any meaningful interaction)
+ * Throttled to once per second - mousemove fires constantly!
  */
 export function resetActivityTimer() {
-    lastActivityTime = Date.now();
+    const now = Date.now();
+    
+    // 🔥 Throttle: Only process once per second
+    if (now - lastActivityCheck < ACTIVITY_THROTTLE_MS) {
+        return; // Skip - too soon since last check
+    }
+    lastActivityCheck = now;
+    
+    // Now do the actual work (at most once per second)
+    lastActivityTime = now;
     timeoutWarningShown = false;
     hideTimeoutWarning(); // Hide warning if it's showing
+    
+    // Persist to localStorage for reload timeout check
+    try {
+        localStorage.setItem('study_last_activity_time', now.toString());
+    } catch (e) {
+        // Ignore localStorage errors
+    }
 }
 
 /**
@@ -42,6 +68,11 @@ export function resetActivityTimer() {
 function checkInactivityTimeout() {
     const now = Date.now();
     const inactiveTime = now - lastActivityTime;
+    
+    // 🔍 DEBUG: Log inactivity time every check
+    const minutes = Math.floor(inactiveTime / 60000);
+    const seconds = Math.floor((inactiveTime % 60000) / 1000);
+    console.log(`⏱️ Inactivity: ${minutes}m ${seconds}s`);
     
     // Show warning at 10 minutes
     if (inactiveTime >= INACTIVE_WARNING_MS && !timeoutWarningShown) {
@@ -412,6 +443,14 @@ export function showTimeoutMessage() {
         }
         
         lastActivityTime = now;
+        
+        // 🔥 Persist activity time for reload timeout check
+        try {
+            localStorage.setItem('study_last_activity_time', lastActivityTime.toString());
+        } catch (e) {
+            // Ignore localStorage errors
+        }
+        
         console.log('🔄 Activity timestamp refreshed for new session');
         
         // Show pre-survey modal (your existing function)
@@ -446,11 +485,18 @@ export async function startActivityTimer() {
     lastActivityTime = Date.now();
     timeoutWarningShown = false;
     
+    // 🔥 Persist initial activity time for reload timeout check
+    try {
+        localStorage.setItem('study_last_activity_time', lastActivityTime.toString());
+    } catch (e) {
+        // Ignore localStorage errors
+    }
+    
     // Check every 30 seconds
     if (timeoutCheckInterval) {
         clearInterval(timeoutCheckInterval);
     }
-    timeoutCheckInterval = setInterval(checkInactivityTimeout, 30000);
+    timeoutCheckInterval = setInterval(checkInactivityTimeout, 60000); // Check every minute
     
     // Track activity events
     document.addEventListener('mousemove', resetActivityTimer);
