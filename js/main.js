@@ -1521,7 +1521,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateParticipantIdDisplay();
     
     // Version info (always show version, details only in dev/personal modes)
-    console.log('🌋 volcano-audio v2.71');
+    console.log('🌋 volcano-audio v2.72');
+    console.log('v2.72 Fix: Speed-adjusted sample counting for fade triggers');
     if (!isStudyMode()) {
         console.log('📌 Refactor: Remove PRE_SURVEY_COMPLETION_DATE flag, use session data as single source of truth');
     }

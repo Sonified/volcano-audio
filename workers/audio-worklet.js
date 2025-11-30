@@ -514,7 +514,7 @@ class SeismicProcessor extends AudioWorkletProcessor {
                 // But we need to know how many INPUT samples to fade over based on speed
                 const fadeTime = this.isLooping && loopDuration < 0.200 ? 2 : this.fadeTimeMs;
                 const FADE_SAMPLES_OUTPUT = Math.floor(fadeTime * 44.1); // Output samples (always same duration)
-                const FADE_SAMPLES_INPUT = Math.floor(FADE_SAMPLES_OUTPUT / this.speed); // Convert to INPUT samples!
+                const FADE_SAMPLES_INPUT = Math.floor(FADE_SAMPLES_OUTPUT * this.speed); // Input samples consumed in that time
                 
                 // 🔍 DIAGNOSTIC LOG - Only print when playing
                 // if (this.isPlaying) {
