@@ -26,3 +26,7 @@ __pycache__/
 .deploy_time
 # Claude instructions
 claude_instructions/
+
+# Downloaded data with PII - NEVER COMMIT
+Qualtrics/Downloaded_Data/
+Qualtrics/analysis/
