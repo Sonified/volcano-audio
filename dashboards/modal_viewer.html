@@ -145,13 +145,19 @@
     </style>
 </head>
 <body>
-    <!-- Permanent Overlay (required for modals) -->
-    <div id="permanentOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 9999; align-items: center; justify-content: center;"></div>
+    <!-- Permanent Overlay (required for modals) - no fade animation for testing dashboard -->
+    <div id="permanentOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 9999; align-items: center; justify-content: center; opacity: 1 !important; transition: none !important;"></div>
 
     <div class="dashboard-container">
-        <div class="dashboard-header">
+        <div class="dashboard-header" style="position: relative;">
             <h1>🌋 Modal Interface Viewer</h1>
             <p>Testing ground for all survey and workflow modals</p>
+            <!-- Participant ID Display (same as main survey page) -->
+            <div id="participantIdDisplay" style="position: absolute; top: 0; right: 0;">
+                <span id="participantIdText" style="font-size: 13px; color: #aaa; cursor: pointer; user-select: none; white-space: nowrap; padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(100, 100, 100, 0.6); background: rgba(40, 40, 40, 0.4); transition: background-color 0.2s; display: inline-block;" title="Click to open Participant Setup">
+                    Participant ID: <span id="participantIdValue" style="font-weight: 600; color: #bbb;">--</span>
+                </span>
+            </div>
         </div>
         
         <!-- Test Controls for Cumulative Stats -->
@@ -218,6 +224,7 @@
                     <button class="modal-button" onclick="showModal('postSurveyModal')">Post-Survey</button>
                     <button class="modal-button" onclick="showModal('activityLevelModal')">Activity Level</button>
                     <button class="modal-button" onclick="showModal('awesfModal')">AWE-SF</button>
+                    <button class="modal-button" onclick="showModal('cnsModal')" style="background: linear-gradient(135deg, #2e7d32 0%, #66bb6a 100%);">CNS (Nature)</button>
                     <button class="modal-button" onclick="showModal('endModal')">End</button>
                 </div>
             </div>
@@ -237,11 +244,41 @@
         import { initializeModals } from '../js/modal-templates.js';
         import { modalManager } from '../js/modal-manager.js';
         import { openEndModal } from '../js/ui-controls.js';
-        import { getParticipantId } from '../js/qualtrics-api.js';
+        import { getParticipantId, storeParticipantId } from '../js/qualtrics-api.js';
+        import { setupCnsSubmitHandler } from '../js/cns-submission.js';
 
         // Initialize modals on page load
         await initializeModals();
         console.log('✅ All modals loaded and ready');
+
+        // Setup CNS submission handler
+        setupCnsSubmitHandler();
+
+        // Update participant ID display
+        function updateParticipantIdDisplay() {
+            const participantId = getParticipantId() || localStorage.getItem('participantId');
+            const valueElement = document.getElementById('participantIdValue');
+            if (valueElement) {
+                valueElement.textContent = participantId || '--';
+            }
+        }
+
+        // Initialize participant ID display
+        updateParticipantIdDisplay();
+
+        // Participant ID display click handler - opens participant modal
+        const participantIdText = document.getElementById('participantIdText');
+        if (participantIdText) {
+            participantIdText.addEventListener('click', () => {
+                window.showModal('participantModal');
+            });
+            participantIdText.addEventListener('mouseenter', function() {
+                this.style.background = 'rgba(60, 60, 60, 0.6)';
+            });
+            participantIdText.addEventListener('mouseleave', function() {
+                this.style.background = 'rgba(40, 40, 40, 0.4)';
+            });
+        }
 
         // Make showModal available globally
         window.showModal = async function(modalId) {
@@ -267,9 +304,13 @@
                 },
                 onClose: () => {
                     console.log(`❌ Modal closed: ${modalId}`);
+                    // Refresh participant ID display after participant modal closes
+                    if (modalId === 'participantModal') {
+                        updateParticipantIdDisplay();
+                    }
                 }
             });
-            
+
             console.log(`🔄 Modal interaction complete: ${modalId}`);
         };
 
@@ -296,6 +337,24 @@
                 const modal = e.target.closest('.modal-window');
                 if (modal) {
                     console.log(`✓ Submit button clicked in ${modal.id}`);
+
+                    // Special handling for participant modal - actually save the ID
+                    if (modal.id === 'participantModal') {
+                        const participantIdInput = document.getElementById('participantId');
+                        if (participantIdInput) {
+                            const participantId = participantIdInput.value.trim();
+                            if (participantId) {
+                                storeParticipantId(participantId);
+                                console.log('💾 Saved participant ID:', participantId);
+                                // Update the display immediately
+                                const valueElement = document.getElementById('participantIdValue');
+                                if (valueElement) {
+                                    valueElement.textContent = participantId;
+                                }
+                            }
+                        }
+                    }
+
                     await modalManager.closeModal(modal.id);
                 }
             }

@@ -1572,6 +1572,54 @@ input[type="checkbox"] {
     display: none;
 }
 
+/* CNS Modal - Connectedness to Nature Scale (14 items, 5-point scale) */
+.cns-modal .modal-content {
+    max-width: 900px;
+}
+
+.cns-modal .mood-scale-item {
+    grid-template-columns: 385px 1fr;
+}
+
+.cns-modal .mood-scale-label {
+    text-align: left;
+    font-size: 15px;
+    line-height: 1.3;
+}
+
+.cns-modal .mood-scale-options {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0px;
+}
+
+.cns-modal .survey-scale-labels {
+    grid-template-columns: 385px 1fr;
+    gap: 6px;
+}
+
+.cns-modal .survey-scale-labels-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0px;
+}
+
+.cns-modal .modal-header {
+    border-bottom: none;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    position: relative;
+    justify-content: flex-end;
+}
+
+.cns-modal .modal-title {
+    text-align: center;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    pointer-events: none;
+    margin: 0;
+}
+
 #preSurveyModal .modal-close {
     display: none;
 }

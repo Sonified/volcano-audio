@@ -3583,18 +3583,42 @@ def upload_user_data():
     try:
         data = request.get_json()
         
-        if not data or 'participantId' not in data:
-            return jsonify({'error': 'Missing participantId'}), 400
-        
-        participant_id = data['participantId']
+        if not data:
+            return jsonify({'error': 'Missing request data'}), 400
+
+        participant_id = data.get('participantId')
         timestamp = data.get('timestamp', datetime.now(timezone.utc).isoformat())
-        upload_type = data.get('uploadType', 'submission')  # 'submission' or 'status'
-        
+        upload_type = data.get('uploadType', 'submission')  # 'submission', 'status', or 'custom'
+
         s3 = get_s3_client()
-        base_path = f'volcano-audio-anonymized-data/participants/{participant_id}'
-        
         uploaded_files = []
-        
+
+        # Handle custom upload type (for CNS surveys, etc.) - skips status.json entirely
+        if upload_type == 'custom' and 'customKey' in data and 'customData' in data:
+            custom_key = data['customKey']
+            custom_data = data['customData']
+
+            s3.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=custom_key,
+                Body=custom_data,  # Already a JSON string
+                ContentType='application/json'
+            )
+            uploaded_files.append(custom_key)
+            print(f"✅ Custom upload to {custom_key}")
+
+            return jsonify({
+                'status': 'success',
+                'uploadType': 'custom',
+                'filesUploaded': uploaded_files
+            }), 200
+
+        # For non-custom uploads, participantId is required
+        if not participant_id:
+            return jsonify({'error': 'Missing participantId'}), 400
+
+        base_path = f'volcano-audio-anonymized-data/participants/{participant_id}'
+
         # 1. Always update user-status/status.json (overwrite)
         status_data = {
             'participantId': participant_id,
@@ -3652,7 +3676,7 @@ def upload_user_data():
             # Format timestamp for filename: 2025-11-19_14-30-45
             dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
             timestamp_str = dt.strftime('%Y-%m-%d_%H-%M-%S')
-            
+
             submission_key = f'{base_path}/submissions/{participant_id}_Complete_{timestamp_str}.json'
             s3.put_object(
                 Bucket=R2_BUCKET_NAME,
@@ -3661,7 +3685,7 @@ def upload_user_data():
                 ContentType='application/json'
             )
             uploaded_files.append(submission_key)
-        
+
         print(f"✅ Uploaded user data for {participant_id}: {uploaded_files}")
         
         return jsonify({

@@ -214,3 +214,42 @@ export async function uploadUserDataComplete(participantId, submissionData) {
     // Note: uploadSubmissionData already includes status update
 }
 
+/**
+ * Generic upload to R2 with custom key and data
+ * Used for CNS surveys and other custom data that doesn't fit the standard submission pattern
+ * @param {string} key - The full R2 key path (e.g., 'volcano-audio-anonymized-data/participants/{id}/CNS_POST/file.json')
+ * @param {string} data - The JSON string data to upload
+ * @returns {Promise<boolean>} - True if upload successful
+ */
+export async function uploadToR2(key, data) {
+    if (!key || !data) {
+        console.warn('⚠️ Cannot upload to R2: missing key or data');
+        return false;
+    }
+
+    try {
+        const response = await fetch(UPLOAD_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                uploadType: 'custom',
+                customKey: key,
+                customData: data
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            console.log('✅ Custom data uploaded to R2:', result);
+            return true;
+        } else {
+            console.error('❌ Failed to upload custom data:', result);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Error uploading custom data:', error);
+        return false;
+    }
+}
+

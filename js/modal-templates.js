@@ -837,8 +837,223 @@ export function createAwesfModal() {
                     </div>
                 </div>
                 </div>
-                
+
                 <button type="button" class="modal-submit" disabled>✓ Next</button>
+            </div>
+        </div>
+    `;
+    return modal;
+}
+
+export function createCnsModal() {
+    const modal = document.createElement('div');
+    modal.id = 'cnsModal';
+    modal.className = 'modal-window cns-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">🌿 Connectedness to Nature Scale</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #333; font-size: 16px; line-height: 1.5; text-align: center;">
+                    Please indicate how much you agree or disagree with each statement.
+                </p>
+
+                <!-- Quick-fill buttons -->
+                <div class="quick-fill-buttons" style="display: flex; gap: 8px; margin-bottom: 15px; padding: 10px; background: rgba(0, 0, 0, 0.05); border-radius: 6px; justify-content: center; flex-wrap: wrap;">
+                    <span style="font-weight: 600; color: #550000; margin-right: 8px; align-self: center;">Quick fill:</span>
+                    <button type="button" class="quick-fill-btn" data-value="1" data-survey="cnsModal" style="padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid #999; background: white; color: #666; border-radius: 4px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">1</button>
+                    <button type="button" class="quick-fill-btn" data-value="2" data-survey="cnsModal" style="padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid #999; background: white; color: #666; border-radius: 4px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">2</button>
+                    <button type="button" class="quick-fill-btn" data-value="3" data-survey="cnsModal" style="padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid #999; background: white; color: #666; border-radius: 4px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">3</button>
+                    <button type="button" class="quick-fill-btn" data-value="4" data-survey="cnsModal" style="padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid #999; background: white; color: #666; border-radius: 4px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">4</button>
+                    <button type="button" class="quick-fill-btn" data-value="5" data-survey="cnsModal" style="padding: 8px 16px; font-size: 14px; font-weight: 600; border: 1px solid #999; background: white; color: #666; border-radius: 4px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='white'">5</button>
+                </div>
+
+                <!-- Scale header labels (5-point scale) -->
+                <div class="survey-scale-labels">
+                    <div></div>
+                    <div class="survey-scale-labels-grid" style="grid-template-columns: repeat(5, 1fr);">
+                        <span>Strongly<br>Disagree</span>
+                        <span>Disagree</span>
+                        <span>Neutral</span>
+                        <span>Agree</span>
+                        <span>Strongly<br>Agree</span>
+                    </div>
+                </div>
+
+                <div class="mood-scale-container">
+                <!-- CNS Item 1 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I often feel a sense of oneness with the natural world around me.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns1" id="cns1_1" value="1"><label for="cns1_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns1" id="cns1_2" value="2"><label for="cns1_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns1" id="cns1_3" value="3"><label for="cns1_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns1" id="cns1_4" value="4"><label for="cns1_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns1" id="cns1_5" value="5"><label for="cns1_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 2 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I think of the natural world as a community to which I belong.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns2" id="cns2_1" value="1"><label for="cns2_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns2" id="cns2_2" value="2"><label for="cns2_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns2" id="cns2_3" value="3"><label for="cns2_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns2" id="cns2_4" value="4"><label for="cns2_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns2" id="cns2_5" value="5"><label for="cns2_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 3 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I recognize and appreciate the intelligence of other living organisms.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns3" id="cns3_1" value="1"><label for="cns3_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns3" id="cns3_2" value="2"><label for="cns3_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns3" id="cns3_3" value="3"><label for="cns3_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns3" id="cns3_4" value="4"><label for="cns3_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns3" id="cns3_5" value="5"><label for="cns3_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 4 (reverse scored) -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I often feel disconnected from nature.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns4" id="cns4_1" value="1"><label for="cns4_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns4" id="cns4_2" value="2"><label for="cns4_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns4" id="cns4_3" value="3"><label for="cns4_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns4" id="cns4_4" value="4"><label for="cns4_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns4" id="cns4_5" value="5"><label for="cns4_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 5 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">When I think of my life, I imagine myself to be part of a larger cyclical process of living.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns5" id="cns5_1" value="1"><label for="cns5_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns5" id="cns5_2" value="2"><label for="cns5_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns5" id="cns5_3" value="3"><label for="cns5_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns5" id="cns5_4" value="4"><label for="cns5_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns5" id="cns5_5" value="5"><label for="cns5_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 6 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I often feel a kinship with animals and plants.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns6" id="cns6_1" value="1"><label for="cns6_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns6" id="cns6_2" value="2"><label for="cns6_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns6" id="cns6_3" value="3"><label for="cns6_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns6" id="cns6_4" value="4"><label for="cns6_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns6" id="cns6_5" value="5"><label for="cns6_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 7 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I feel as though I belong to the Earth as equally as it belongs to me.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns7" id="cns7_1" value="1"><label for="cns7_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns7" id="cns7_2" value="2"><label for="cns7_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns7" id="cns7_3" value="3"><label for="cns7_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns7" id="cns7_4" value="4"><label for="cns7_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns7" id="cns7_5" value="5"><label for="cns7_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 8 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I have a deep understanding of how my actions affect the natural world.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns8" id="cns8_1" value="1"><label for="cns8_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns8" id="cns8_2" value="2"><label for="cns8_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns8" id="cns8_3" value="3"><label for="cns8_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns8" id="cns8_4" value="4"><label for="cns8_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns8" id="cns8_5" value="5"><label for="cns8_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 9 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I often feel part of the web of life.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns9" id="cns9_1" value="1"><label for="cns9_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns9" id="cns9_2" value="2"><label for="cns9_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns9" id="cns9_3" value="3"><label for="cns9_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns9" id="cns9_4" value="4"><label for="cns9_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns9" id="cns9_5" value="5"><label for="cns9_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 10 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I feel that all inhabitants of Earth, human, and nonhuman, share a common 'life force'.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns10" id="cns10_1" value="1"><label for="cns10_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns10" id="cns10_2" value="2"><label for="cns10_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns10" id="cns10_3" value="3"><label for="cns10_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns10" id="cns10_4" value="4"><label for="cns10_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns10" id="cns10_5" value="5"><label for="cns10_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 11 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">Like a tree can be part of a forest, I feel embedded within the broader natural world.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns11" id="cns11_1" value="1"><label for="cns11_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns11" id="cns11_2" value="2"><label for="cns11_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns11" id="cns11_3" value="3"><label for="cns11_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns11" id="cns11_4" value="4"><label for="cns11_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns11" id="cns11_5" value="5"><label for="cns11_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 12 (reverse scored) -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">When I think of my place on Earth, I consider myself to be a top member of a hierarchy that exists in nature.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns12" id="cns12_1" value="1"><label for="cns12_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns12" id="cns12_2" value="2"><label for="cns12_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns12" id="cns12_3" value="3"><label for="cns12_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns12" id="cns12_4" value="4"><label for="cns12_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns12" id="cns12_5" value="5"><label for="cns12_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 13 -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">I often feel like I am only a small part of the natural world around me, and that I am no more important than the grass on the ground or the birds in the trees.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns13" id="cns13_1" value="1"><label for="cns13_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns13" id="cns13_2" value="2"><label for="cns13_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns13" id="cns13_3" value="3"><label for="cns13_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns13" id="cns13_4" value="4"><label for="cns13_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns13" id="cns13_5" value="5"><label for="cns13_5">5</label></div>
+                    </div>
+                </div>
+
+                <!-- CNS Item 14 (reverse scored) -->
+                <div class="mood-scale-item">
+                    <div class="mood-scale-label">My personal welfare is independent of the welfare of the natural world.</div>
+                    <div class="mood-scale-options cns-5point">
+                        <div class="mood-scale-option"><input type="radio" name="cns14" id="cns14_1" value="1"><label for="cns14_1">1</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns14" id="cns14_2" value="2"><label for="cns14_2">2</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns14" id="cns14_3" value="3"><label for="cns14_3">3</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns14" id="cns14_4" value="4"><label for="cns14_4">4</label></div>
+                        <div class="mood-scale-option"><input type="radio" name="cns14" id="cns14_5" value="5"><label for="cns14_5">5</label></div>
+                    </div>
+                </div>
+                </div>
+
+                <button type="button" class="modal-submit" disabled>✓ Submit</button>
             </div>
         </div>
     `;
@@ -860,6 +1075,7 @@ export async function initializeModals() {
     const postSurveyModal = createPostSurveyModal();
     const activityLevelModal = createActivityLevelModal();
     const awesfModal = createAwesfModal();
+    const cnsModal = createCnsModal();
     const endModal = createEndModal();
     const beginAnalysisModal = createBeginAnalysisModal();
     const missingStudyIdModal = createMissingStudyIdModal();
@@ -867,7 +1083,7 @@ export async function initializeModals() {
     const tutorialIntroModal = createTutorialIntroModal();
     const tutorialRevisitModal = createTutorialRevisitModal();
     const welcomeBackModal = createWelcomeBackModal();
-    
+
     // Append modals to the permanent overlay instead of body
     const overlay = document.getElementById('permanentOverlay');
     overlay.appendChild(welcomeModal);
@@ -876,6 +1092,7 @@ export async function initializeModals() {
     overlay.appendChild(postSurveyModal);
     overlay.appendChild(activityLevelModal);
     overlay.appendChild(awesfModal);
+    overlay.appendChild(cnsModal);
     overlay.appendChild(endModal);
     overlay.appendChild(beginAnalysisModal);
     overlay.appendChild(missingStudyIdModal);
