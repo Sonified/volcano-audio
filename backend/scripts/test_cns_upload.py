@@ -8,24 +8,28 @@ import os
 import json
 import boto3
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from project root
+project_root = Path(__file__).parent.parent.parent
+load_dotenv(project_root / ".env")
 
-# R2 configuration
-s3 = boto3.client(
-    "s3",
-    endpoint_url=os.getenv("R2_ENDPOINT_URL"),
-    aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"),
-    region_name="auto"
-)
-
-BUCKET = os.getenv("R2_BUCKET_NAME")
+def get_s3_client():
+    """Create S3 client after env vars are loaded"""
+    return boto3.client(
+        "s3",
+        endpoint_url=os.getenv("R2_ENDPOINT"),
+        aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"),
+        region_name="auto"
+    )
 
 def test_cns_upload():
     """Test uploading a CNS survey response"""
+
+    s3 = get_s3_client()
+    BUCKET = os.getenv("R2_BUCKET_NAME")
 
     # Test data
     participant_id = "TEST_CNS_UPLOAD"
@@ -60,9 +64,9 @@ def test_cns_upload():
         }
     }
 
-    # Create the key path
+    # Create the key path - CNS_POST at top level
     filename = f"{participant_id}_CNS_POST_{timestamp}.json"
-    key = f"volcano-audio-anonymized-data/participants/{participant_id}/CNS_POST/{filename}"
+    key = f"volcano-audio-anonymized-data/CNS_POST/{filename}"
 
     print(f"Testing CNS upload to R2...")
     print(f"Bucket: {BUCKET}")
@@ -90,11 +94,11 @@ def test_cns_upload():
         print(f"   Read back participantId: {content['participantId']}")
         print(f"   Read back surveyType: {content['surveyType']}")
 
-        # Clean up test data
-        print()
-        print("Cleaning up test data...")
-        s3.delete_object(Bucket=BUCKET, Key=key)
-        print("✅ Test data deleted")
+        # Keep test data for inspection
+        # print()
+        # print("Cleaning up test data...")
+        # s3.delete_object(Bucket=BUCKET, Key=key)
+        # print("✅ Test data deleted")
 
         return True
 

@@ -245,6 +245,7 @@ class ModalManager {
             'postSurveyModal',
             'activityLevelModal',
             'awesfModal',
+            'cnsModal',
             'endModal',
             'beginAnalysisModal',
             'missingStudyIdModal',
@@ -267,19 +268,17 @@ class ModalManager {
     
     /**
      * Disable background scrolling when modal is open
+     * Note: Avoid position:fixed on body as it can break background rendering
      */
     disableBackgroundScroll() {
         // Store current scroll position
         this.scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
-        
-        // Disable scrolling on both html and body
+
+        // Disable scrolling on both html and body (without position:fixed which breaks backgrounds)
         document.documentElement.style.overflow = 'hidden';
         document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${this.scrollPosition}px`;
-        document.body.style.width = '100%';
     }
-    
+
     /**
      * Re-enable background scrolling when modal closes
      */
@@ -287,10 +286,7 @@ class ModalManager {
         // Re-enable scrolling on both html and body
         document.documentElement.style.overflow = '';
         document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        
+
         // Restore scroll position
         window.scrollTo(0, this.scrollPosition);
     }

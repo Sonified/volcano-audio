@@ -1086,33 +1086,110 @@ async function initializePersonalMode() {
 }
 
 /**
- * DEV MODE: Tutorial EVERY TIME (for testing/development)
- * Perfect for iterating on the tutorial experience
+ * DEV MODE: Welcome Back → CNS → Tutorial (for testing/development)
+ * Shows the full onboarding flow with modals before tutorial
  */
 async function initializeDevMode() {
-    console.log('🔧 DEV MODE: Tutorial runs every time (for testing)');
-    
-    // 🧹 CLEAR ALL STUDY/TUTORIAL/SESSION STATE - Start fresh every time
-    console.log('🧹 Clearing all study/tutorial/session state for fresh dev testing...');
+    console.log('🔧 DEV MODE: Welcome Back → CNS → Tutorial flow');
+
+    // 🧹 CLEAR STUDY/TUTORIAL STATE - but preserve CNS completion flag
+    console.log('🧹 Clearing study/tutorial state (preserving CNS flag)...');
     const { STORAGE_KEYS } = await import('./study-workflow.js');
-    
+    const { hasCnsPostCompleted } = await import('./cns-submission.js');
+
     // Clear all study workflow flags
     Object.entries(STORAGE_KEYS).forEach(([name, key]) => {
         localStorage.removeItem(key);
     });
-    
+
     // Also clear any legacy flags
     localStorage.removeItem('study_has_seen_tutorial');
     localStorage.removeItem('selectedMode'); // Clear mode override
-    
+
     console.log('✅ State cleared - fresh slate for testing');
-    
-    // 🔥 ALWAYS run tutorial in DEV mode (no caching)
-    console.log('🎓 Running tutorial (DEV mode always shows it)');
-    
+
+    // Check CNS completion status (persists across dev sessions)
+    const cnsCompleted = hasCnsPostCompleted();
+    console.log(`🌿 CNS completion status: ${cnsCompleted ? 'completed' : 'not completed'}`);
+
+    // CNS submit handler is now in ui-controls.js (setupModalEventListeners)
+
+    // Use the EXISTING openWelcomeBackModal function (proper overlay handling)
+    const { openWelcomeBackModal, closeWelcomeBackModal, fadeOutOverlay } = await import('./ui-controls.js');
+
+    console.log('👋 Opening Welcome Back modal...');
+
+    // Wait for Welcome Back modal to be acknowledged
+    await new Promise((resolveWelcome) => {
+        const welcomeBackModal = document.getElementById('welcomeBackModal');
+        const welcomeBackSubmitBtn = welcomeBackModal?.querySelector('.modal-submit');
+
+        if (!welcomeBackModal || !welcomeBackSubmitBtn) {
+            console.error('❌ Welcome Back modal or submit button not found');
+            resolveWelcome();
+            return;
+        }
+
+        // One-time handler that INTERCEPTS before default handler
+        const devHandler = async (e) => {
+            e.stopImmediatePropagation(); // Prevent default closeWelcomeBackModal handler
+            console.log('✅ Welcome Back acknowledged (dev mode)');
+
+            // Close modal manually, keeping overlay if CNS is needed
+            welcomeBackModal.style.display = 'none';
+
+            if (!cnsCompleted) {
+                // Keep overlay for CNS modal
+                resolveWelcome();
+            } else {
+                // No CNS needed, fade out overlay
+                fadeOutOverlay();
+                resolveWelcome();
+            }
+        };
+
+        // Use capture:true to run BEFORE the default handler
+        welcomeBackSubmitBtn.addEventListener('click', devHandler, { once: true, capture: true });
+
+        // Open modal using the proper function
+        openWelcomeBackModal();
+    });
+
+    // If CNS not completed, show it directly (no modalManager to avoid body style changes)
+    if (!cnsCompleted) {
+        console.log('🌿 Opening CNS survey (not yet completed)...');
+
+        await new Promise((resolveCns) => {
+            const cnsModal = document.getElementById('cnsModal');
+            if (!cnsModal) {
+                console.error('❌ CNS modal not found');
+                fadeOutOverlay();
+                resolveCns();
+                return;
+            }
+
+            // Show CNS modal (overlay already visible from welcome back)
+            cnsModal.style.display = 'flex';
+
+            // Wait for CNS submission to close the modal
+            const checkClosed = setInterval(() => {
+                if (cnsModal.style.display === 'none') {
+                    clearInterval(checkClosed);
+                    console.log('✅ CNS modal closed');
+                    fadeOutOverlay();
+                    resolveCns();
+                }
+            }, 100);
+        });
+    } else {
+        console.log('🌿 CNS already completed, skipping');
+    }
+
+    // Now run tutorial
+    console.log('🎓 Running tutorial...');
     const { runInitialTutorial } = await import('./tutorial.js');
     await runInitialTutorial();
-    
+
     console.log('✅ Tutorial completed');
     console.log('✅ Dev mode ready');
 }

@@ -145,8 +145,8 @@
     </style>
 </head>
 <body>
-    <!-- Permanent Overlay (required for modals) - no fade animation for testing dashboard -->
-    <div id="permanentOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 9999; align-items: center; justify-content: center; opacity: 1 !important; transition: none !important;"></div>
+    <!-- Permanent Overlay (required for modals) -->
+    <div id="permanentOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 9999; align-items: center; justify-content: center;"></div>
 
     <div class="dashboard-container">
         <div class="dashboard-header" style="position: relative;">
@@ -245,14 +245,10 @@
         import { modalManager } from '../js/modal-manager.js';
         import { openEndModal } from '../js/ui-controls.js';
         import { getParticipantId, storeParticipantId } from '../js/qualtrics-api.js';
-        import { setupCnsSubmitHandler } from '../js/cns-submission.js';
 
         // Initialize modals on page load
         await initializeModals();
         console.log('✅ All modals loaded and ready');
-
-        // Setup CNS submission handler
-        setupCnsSubmitHandler();
 
         // Update participant ID display
         function updateParticipantIdDisplay() {

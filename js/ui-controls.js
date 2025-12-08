@@ -510,7 +510,15 @@ async function getNextModalInWorkflow(currentModalId) {
             return 'preSurveyModal';
             
         case 'welcomeBackModal':
-            // RETURNING VISIT: Welcome Back → Pre-Survey
+            // RETURNING VISIT: Welcome Back → CNS (if not completed) → Pre-Survey
+            const { hasCnsPostCompleted } = await import('./cns-submission.js');
+            if (!hasCnsPostCompleted()) {
+                return 'cnsModal';
+            }
+            return 'preSurveyModal';
+
+        case 'cnsModal':
+            // CNS → Pre-Survey (always)
             return 'preSurveyModal';
             
         case 'preSurveyModal':
@@ -572,6 +580,7 @@ export function closeAllModals() {
         'postSurveyModal',
         'activityLevelModal',
         'awesfModal',
+        'cnsModal',
         'endModal',
         'beginAnalysisModal',
         'missingStudyIdModal',
@@ -1548,7 +1557,168 @@ export function setupModalEventListeners() {
             }
         });
     }
-    
+
+    // CNS (Connectedness to Nature Scale) modal handlers
+    const cnsModal = document.getElementById('cnsModal');
+    if (cnsModal) {
+        const cnsSubmitBtn = cnsModal.querySelector('.modal-submit');
+
+        // Function to check if all CNS questions are answered (14 items)
+        const updateCnsSubmitButton = () => {
+            let allAnswered = true;
+            for (let i = 1; i <= 14; i++) {
+                if (!document.querySelector(`input[name="cns${i}"]:checked`)) {
+                    allAnswered = false;
+                    break;
+                }
+            }
+
+            if (cnsSubmitBtn) {
+                cnsSubmitBtn.disabled = !allAnswered;
+            }
+        };
+
+        // Listen for changes to enable/disable submit button
+        cnsModal.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                e.stopPropagation();
+                updateCnsSubmitButton();
+            });
+            radio.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        });
+
+        // Prevent label clicks from bubbling
+        cnsModal.querySelectorAll('label').forEach(label => {
+            label.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        });
+
+        // Initial button state check
+        updateCnsSubmitButton();
+
+        // Quick-fill button handlers for CNS
+        cnsModal.querySelectorAll('.quick-fill-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event from bubbling to modal/overlay
+                e.preventDefault(); // Prevent any default behavior
+
+                const value = btn.getAttribute('data-value');
+                console.log(`🔵 Quick-fill button clicked: filling all CNS questions with value ${value}`);
+
+                // Fill all CNS radio buttons with this value (cns1 through cns14)
+                for (let i = 1; i <= 14; i++) {
+                    const radio = cnsModal.querySelector(`input[name="cns${i}"][value="${value}"]`);
+                    if (radio) {
+                        radio.checked = true;
+                        radio.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+
+                // Update submit button state after filling
+                updateCnsSubmitButton();
+
+                // Visual feedback
+                btn.style.background = '#4CAF50';
+                btn.style.color = 'white';
+                setTimeout(() => {
+                    btn.style.background = 'white';
+                    btn.style.color = '#666';
+                }, 200);
+            });
+        });
+
+        // Keyboard shortcut: Enter key picks random number and fills all (1-5 for CNS)
+        cnsModal.addEventListener('keydown', (e) => {
+            // Only handle if modal is visible
+            if (cnsModal.style.display === 'none') return;
+
+            // Enter key: pick random number (1-5) and fill all
+            if (e.key === 'Enter' && !e.target.matches('input[type="text"], input[type="number"], button')) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Pick random number between 1 and 5
+                const randomValue = Math.floor(Math.random() * 5) + 1;
+
+                // Fill all CNS radio buttons with this value
+                for (let i = 1; i <= 14; i++) {
+                    const radio = cnsModal.querySelector(`input[name="cns${i}"][value="${randomValue}"]`);
+                    if (radio) {
+                        radio.checked = true;
+                        radio.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+
+                // Update submit button state after filling
+                updateCnsSubmitButton();
+
+                // Visual feedback on the button
+                const quickFillBtn = cnsModal.querySelector(`.quick-fill-btn[data-value="${randomValue}"]`);
+                if (quickFillBtn) {
+                    quickFillBtn.style.background = '#4CAF50';
+                    quickFillBtn.style.color = 'white';
+                    setTimeout(() => {
+                        quickFillBtn.style.background = 'white';
+                        quickFillBtn.style.color = '#666';
+                    }, 200);
+                }
+            }
+        });
+
+        // Submit button click handler
+        if (cnsSubmitBtn) {
+            cnsSubmitBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Validate all questions answered
+                let allAnswered = true;
+                for (let i = 1; i <= 14; i++) {
+                    if (!document.querySelector(`input[name="cns${i}"]:checked`)) {
+                        allAnswered = false;
+                        break;
+                    }
+                }
+
+                if (!allAnswered) {
+                    alert('Please answer all questions before submitting.');
+                    return;
+                }
+
+                // Disable button during submission
+                cnsSubmitBtn.disabled = true;
+                cnsSubmitBtn.textContent = 'Submitting...';
+
+                try {
+                    const { submitCnsToR2 } = await import('./cns-submission.js');
+                    const success = await submitCnsToR2();
+
+                    if (success) {
+                        cnsSubmitBtn.textContent = '✓ Submitted!';
+                        // Close modal and chain to pre-survey after brief delay
+                        setTimeout(async () => {
+                            await closeCnsModal();
+                        }, 1000);
+                    } else {
+                        cnsSubmitBtn.disabled = false;
+                        cnsSubmitBtn.textContent = '✓ Submit';
+                        alert('Submission failed. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('❌ CNS submission error:', error);
+                    cnsSubmitBtn.disabled = false;
+                    cnsSubmitBtn.textContent = '✓ Submit';
+                    alert('Submission failed. Please try again.');
+                }
+            });
+        }
+
+        console.log('✅ CNS modal handlers configured');
+    }
+
     // Tutorial Intro modal event listeners
     const tutorialIntroModal = document.getElementById('tutorialIntroModal');
     if (!tutorialIntroModal) {
@@ -2189,23 +2359,40 @@ export function closeBeginAnalysisModal(keepOverlay = null) {
 }
 
 // Welcome Back Modal Functions
-export function openWelcomeBackModal() {
+export async function openWelcomeBackModal() {
     // Close all other modals first
     closeAllModals();
-    
+
     const modal = document.getElementById('welcomeBackModal');
-    
+
     // Fade in overlay background (standard design pattern)
     fadeInOverlay();
-    
+
     if (modal) {
+        // Update content based on CNS completion status
+        const { hasCnsPostCompleted } = await import('./cns-submission.js');
+        const cnsCompleted = hasCnsPostCompleted();
+
+        const titleElement = modal.querySelector('.modal-title');
+        const bodyText = modal.querySelector('.modal-body p');
+
+        if (!cnsCompleted) {
+            // CNS not yet completed - show CNS-focused message
+            if (titleElement) titleElement.innerHTML = '🌿 Welcome back!';
+            if (bodyText) bodyText.innerHTML = 'You will be completing your final <strong>Connectedness to Nature</strong> survey before beginning your session today.';
+        } else {
+            // CNS completed - show default message
+            if (titleElement) titleElement.innerHTML = '🌋 Welcome back!';
+            if (bodyText) bodyText.innerHTML = 'Are you ready to begin? Your session should be completed in one sitting. Please use high-quality speakers or headphones.';
+        }
+
         modal.style.display = 'flex';
         // Make modal focusable for keyboard events
         modal.setAttribute('tabindex', '-1');
         modal.style.outline = 'none'; // Remove browser's blue focus outline
         // Focus the modal so keyboard events work
         modal.focus();
-        console.log('👋 Welcome Back modal opened');
+        console.log(`👋 Welcome Back modal opened (CNS ${cnsCompleted ? 'completed' : 'pending'})`);
     } else {
         console.error('❌ Welcome Back modal not found in DOM');
     }
@@ -2236,13 +2423,16 @@ export async function closeWelcomeBackModal(keepOverlay = null) {
     // If there's a next modal, open it
     const nextModal = await getNextModalInWorkflow('welcomeBackModal');
     if (nextModal) {
-        if (nextModal === 'preSurveyModal') {
-            const { openPreSurveyModal } = await import('./ui-controls.js');
+        if (nextModal === 'cnsModal') {
+            // Open CNS modal (CNS not yet completed)
+            console.log('🌿 Opening CNS survey (from Welcome Back)...');
+            openCnsModal();
+        } else if (nextModal === 'preSurveyModal') {
             openPreSurveyModal();
         }
     }
-    
-    console.log(`👋 Welcome Back modal closed (keepOverlay: ${keepOverlay})`);
+
+    console.log(`👋 Welcome Back modal closed (keepOverlay: ${keepOverlay}, nextModal: ${nextModal})`);
 }
 
 // Complete Confirmation Modal Functions
@@ -2892,13 +3082,67 @@ export async function submitActivityLevelSurvey() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════
+// CNS Modal Functions
+// ═══════════════════════════════════════════════════════════
+
+export function openCnsModal() {
+    // Close all other modals first
+    closeAllModals();
+
+    // Fade in overlay background
+    fadeInOverlay();
+
+    document.getElementById('cnsModal').style.display = 'flex';
+    console.log('🌿 CNS modal opened');
+
+    // Ensure quick-fill buttons are properly enabled/disabled
+    toggleQuickFillButtons();
+
+    // Track survey start
+    const participantId = getParticipantId();
+    if (participantId) {
+        trackSurveyStart(participantId, 'cns');
+    }
+}
+
+export async function closeCnsModal(keepOverlay = null) {
+    // Auto-detect if overlay should be kept
+    if (keepOverlay === null) {
+        const nextModal = await getNextModalInWorkflow('cnsModal');
+        keepOverlay = nextModal !== null;
+    }
+
+    const modal = document.getElementById('cnsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+
+    // Only fade out overlay if NOT keeping it for next modal
+    if (!keepOverlay) {
+        fadeOutOverlay();
+    }
+
+    console.log(`🌿 CNS modal closed (keepOverlay: ${keepOverlay})`);
+
+    // Chain to next modal (pre-survey)
+    const nextModal = await getNextModalInWorkflow('cnsModal');
+    if (nextModal === 'preSurveyModal') {
+        openPreSurveyModal();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AWE-SF Modal Functions
+// ═══════════════════════════════════════════════════════════
+
 export function openAwesfModal() {
     // Close all other modals first
     closeAllModals();
-    
+
     // Fade in overlay background (standard design pattern)
     fadeInOverlay();
-    
+
     document.getElementById('awesfModal').style.display = 'flex';
     console.log('✨ AWE-SF modal opened');
     

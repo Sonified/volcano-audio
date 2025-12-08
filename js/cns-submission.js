@@ -103,7 +103,7 @@ export async function submitCnsToR2() {
 
         // Create filename with participant ID and timestamp
         const filename = `${participantId}_CNS_POST_${timestamp.replace(/[:.]/g, '-')}.json`;
-        const key = `volcano-audio-anonymized-data/participants/${participantId}/CNS_POST/${filename}`;
+        const key = `volcano-audio-anonymized-data/CNS_POST/${filename}`;
 
         const success = await uploadToR2(key, JSON.stringify(payload, null, 2));
 
@@ -164,10 +164,10 @@ export function setupCnsSubmitHandler() {
 
         if (success) {
             submitBtn.textContent = '✓ Submitted!';
-            // Close the modal after a brief delay
+            // Close the modal after a brief delay and chain to next in workflow
             setTimeout(async () => {
-                const { modalManager } = await import('./modal-manager.js');
-                modalManager.closeModal('cnsModal');
+                const { closeCnsModal } = await import('./ui-controls.js');
+                await closeCnsModal();
             }, 1000);
         } else {
             submitBtn.disabled = false;
