@@ -1519,6 +1519,36 @@ export function updateSpectrogramViewport(playbackRate) {
         return;
     }
 
+    // 🔧 FIX: Check if we're in a region and the infinite canvas contains the wrong view
+    // This prevents the "zoom out flash" bug when changing frequency scale in region mode
+    // and then clicking the waveform (which calls restoreViewportState)
+    const { zoomState } = State;
+    if (zoomState && zoomState.isInitialized() && zoomState.isInRegion()) {
+        // Get current region bounds
+        const regionRange = zoomState.getRegionRange();
+        const dataStartMs = State.dataStartTime ? State.dataStartTime.getTime() : 0;
+        const originalSampleRate = State.currentMetadata?.original_sample_rate || 50;
+
+        const regionStartSeconds = (regionRange.startTime.getTime() - dataStartMs) / 1000;
+        const regionEndSeconds = (regionRange.endTime.getTime() - dataStartMs) / 1000;
+        const regionStartSample = Math.floor(regionStartSeconds * originalSampleRate);
+        const regionEndSample = Math.floor(regionEndSeconds * originalSampleRate);
+
+        // Check if infinite canvas contains the region view or full view
+        const infiniteContainsRegion =
+            infiniteCanvasContext.startSample === regionStartSample &&
+            infiniteCanvasContext.endSample === regionEndSample;
+
+        if (!infiniteContainsRegion) {
+            // Infinite canvas contains full view (elastic friend), not the current region
+            // Don't update viewport - we want to keep showing the region view
+            if (!isStudyMode()) {
+                console.log(`🛑 Skipping viewport update: in region but infinite canvas contains full view`);
+            }
+            return;
+        }
+    }
+
     if (!infiniteSpectrogramCanvas) {
         if (!isStudyMode()) {
             console.log(`⚠️ updateSpectrogramViewport: No infinite canvas! playbackRate=${playbackRate}`);
