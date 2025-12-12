@@ -66,6 +66,12 @@ export function resetActivityTimer() {
  * Check for inactivity timeout (runs every 30 seconds)
  */
 function checkInactivityTimeout() {
+    // Skip timeout checks for results2025 mode
+    const participantId = localStorage.getItem('participantID');
+    if (participantId && participantId.toLowerCase() === 'results2025') {
+        return;
+    }
+
     const now = Date.now();
     const inactiveTime = now - lastActivityTime;
     
@@ -91,6 +97,12 @@ function checkInactivityTimeout() {
  * Handles cases where page was backgrounded/closed for extended periods
  */
 function checkTimeoutOnVisibilityChange() {
+    // Skip timeout checks for results2025 mode
+    const participantId = localStorage.getItem('participantID');
+    if (participantId && participantId.toLowerCase() === 'results2025') {
+        return;
+    }
+
     const now = Date.now();
     const inactiveTime = now - lastActivityTime;
     
@@ -480,13 +492,20 @@ export function showTimeoutMessage() {
 
 /**
  * Start activity monitoring
- * Only activates in study modes - disabled for dev/personal modes
+ * Only activates in study modes - disabled for dev/personal modes and results2025 user
  */
 export async function startActivityTimer() {
+    // Check if we're results2025 user (no timeouts for results viewing)
+    const participantId = localStorage.getItem('participantID');
+    if (participantId && participantId.toLowerCase() === 'results2025') {
+        console.log('⏱️ Activity timer disabled (results2025 mode)');
+        return;
+    }
+
     // Check if we're in a study mode
     try {
         const { isStudyMode } = await import('./master-modes.js');
-        
+
         if (!isStudyMode()) {
             console.log('⏱️ Activity timer disabled (not in study mode)');
             return;
