@@ -2253,7 +2253,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         viewResultsBtn.addEventListener('click', (e) => {
             e.preventDefault();
             console.log('📊 View Results button clicked - opening Volcano_Study_Outcomes.html');
-            window.open('Qualtrics/analysis/Volcano_Study_Outcomes.html', '_blank');
+            window.open('final_analysis/Volcano_Study_Outcomes.html', '_blank');
         });
     }
 
