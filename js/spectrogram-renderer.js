@@ -189,7 +189,8 @@ function rebuildCanvasBoxesFromFeatures() {
                     startTime: feature.startTime,
                     endTime: feature.endTime,
                     lowFreq: parseFloat(feature.lowFreq),
-                    highFreq: parseFloat(feature.highFreq)
+                    highFreq: parseFloat(feature.highFreq),
+                    notes: feature.notes || '' // Add notes for annotations
                 });
             }
         });
@@ -200,13 +201,37 @@ function rebuildCanvasBoxesFromFeatures() {
 }
 
 /**
+ * Check if we're in results2025 mode (annotations should be shown)
+ */
+function isResults2025Mode() {
+    const participantId = localStorage.getItem('participantId');
+    return participantId && participantId.toLowerCase() === 'results2025';
+}
+
+/**
  * Redraw canvas boxes (internal - clears and draws all boxes)
+ * Uses two-pass rendering: boxes first, then annotations on top
  */
 function redrawCanvasBoxes() {
     if (spectrogramOverlayCtx && spectrogramOverlayCanvas) {
+        const canvas = document.getElementById('spectrogram');
+        if (!canvas) return;
+
         spectrogramOverlayCtx.clearRect(0, 0, spectrogramOverlayCanvas.width, spectrogramOverlayCanvas.height);
+
+        // PASS 1: Draw all feature boxes (no annotations yet)
         for (const savedBox of completedSelectionBoxes) {
             drawSavedBox(spectrogramOverlayCtx, savedBox);
+        }
+
+        // PASS 2: Draw annotations on top (only in results2025 mode)
+        if (isResults2025Mode()) {
+            const placedAnnotations = []; // Track placed annotations for collision detection
+            for (const savedBox of completedSelectionBoxes) {
+                if (savedBox.notes) {
+                    drawAnnotation(spectrogramOverlayCtx, canvas, savedBox, placedAnnotations);
+                }
+            }
         }
     }
 }
@@ -1282,6 +1307,243 @@ export function cancelSpectrogramSelection() {
 }
 
 /**
+ * Wrap text to fit within maxWidth
+ * CRITICAL: ctx.font MUST be set before calling this function
+ */
+function wrapText(ctx, text, maxWidth) {
+    if (!text) return [];
+
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
+        const metrics = ctx.measureText(testLine);
+
+        if (metrics.width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = words[i];
+        } else {
+            currentLine = testLine;
+        }
+    }
+
+    if (currentLine) {
+        lines.push(currentLine);
+    }
+
+    return lines.length > 0 ? lines : [text];
+}
+
+/**
+ * Draw annotation text above a feature box with collision detection
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {HTMLCanvasElement} canvas - Canvas element
+ * @param {Object} box - Feature box data
+ * @param {Array} placedAnnotations - Array tracking already placed annotations for collision detection
+ */
+function drawAnnotation(ctx, canvas, box, placedAnnotations) {
+    // Only draw annotations if box has notes
+    if (!box.notes || box.notes.trim() === '') {
+        return;
+    }
+
+    // Need zoom state and data times
+    if (!State.dataStartTime || !State.dataEndTime || !zoomState.isInitialized()) {
+        return;
+    }
+
+    // Calculate box position (same logic as drawSavedBox)
+    const lowFreq = box.lowFreq;
+    const highFreq = box.highFreq;
+
+    const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
+    const originalNyquist = originalSampleRate / 2;
+    const playbackRate = State.currentPlaybackRate || 1.0;
+
+    const scaleTransition = getScaleTransitionState();
+
+    let lowFreqY_device, highFreqY_device;
+
+    if (scaleTransition.inProgress && scaleTransition.oldScaleType) {
+        const oldLowY = getYPositionForFrequencyScaled(lowFreq, originalNyquist, canvas.height, scaleTransition.oldScaleType, playbackRate);
+        const newLowY = getYPositionForFrequencyScaled(lowFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
+        const oldHighY = getYPositionForFrequencyScaled(highFreq, originalNyquist, canvas.height, scaleTransition.oldScaleType, playbackRate);
+        const newHighY = getYPositionForFrequencyScaled(highFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
+
+        lowFreqY_device = oldLowY + (newLowY - oldLowY) * scaleTransition.interpolationFactor;
+        highFreqY_device = oldHighY + (newHighY - oldHighY) * scaleTransition.interpolationFactor;
+    } else {
+        lowFreqY_device = getYPositionForFrequencyScaled(lowFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
+        highFreqY_device = getYPositionForFrequencyScaled(highFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
+    }
+
+    const startTimestamp = new Date(box.startTime);
+    const endTimestamp = new Date(box.endTime);
+
+    // Use EXACT same interpolated time range as spectrogram elastic stretching!
+    const interpolatedRange = getInterpolatedTimeRange();
+    const displayStartMs = interpolatedRange.startTime.getTime();
+    const displayEndMs = interpolatedRange.endTime.getTime();
+    const displaySpanMs = displayEndMs - displayStartMs;
+
+    const startMs = startTimestamp.getTime();
+    const endMs = endTimestamp.getTime();
+
+    const startProgress = (startMs - displayStartMs) / displaySpanMs;
+    const endProgress = (endMs - displayStartMs) / displaySpanMs;
+
+    const startX_device = startProgress * canvas.width;
+    const endX_device = endProgress * canvas.width;
+
+    // Check if box is off-screen
+    if (endX_device < 0 || startX_device > canvas.width) {
+        return;
+    }
+
+    const topY = Math.min(highFreqY_device, lowFreqY_device);
+    const bottomY = Math.max(highFreqY_device, lowFreqY_device);
+    if (bottomY < 0 || topY > canvas.height) {
+        return;
+    }
+
+    const boxX = Math.min(startX_device, endX_device);
+    const boxY = Math.min(highFreqY_device, lowFreqY_device);
+    const boxWidth = Math.abs(endX_device - startX_device);
+    const boxHeight = Math.abs(lowFreqY_device - highFreqY_device);
+
+    // Text positioning
+    ctx.save();
+    ctx.font = '600 13px Arial, sans-serif';
+
+    const maxWidth = 325; // Device pixels
+    const lines = wrapText(ctx, box.notes, maxWidth);
+    const lineHeight = 16; // Device pixels
+    const totalTextHeight = lines.length * lineHeight;
+
+    // Measure actual text width
+    const textWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+    const halfWidth = textWidth / 2;
+
+    // Center text above box (default)
+    let textX = boxX + (boxWidth / 2);
+    let textY = boxY - 20 - totalTextHeight;
+    let drawBelow = false;
+    let drawToSide = null; // 'left' or 'right' if drawing to the side
+
+    // Top guard - if annotation would go off the top, draw below instead
+    if (textY < 10) {
+        textY = boxY + boxHeight + 20;
+        drawBelow = true;
+    }
+
+    // Collision detection - draw to side if too close to another annotation
+    let finalTextX = textX;
+    let finalTextY = textY;
+    const padding = 10;
+    const sideOffset = 30;
+
+    // Check for collision with any placed annotation (single pass, no loop)
+    for (const placed of placedAnnotations) {
+        // Check X overlap (25% wider for breathing room)
+        const xOverlap = Math.abs(finalTextX - placed.x) <
+            ((halfWidth + placed.halfWidth) * 1.25 + padding);
+
+        // Check Y overlap
+        const yOverlap = Math.abs(finalTextY - placed.y) <
+            (totalTextHeight / 2 + placed.height / 2 + padding);
+
+        if (xOverlap && yOverlap) {
+            // Collision detected! Draw to the side, away from the colliding annotation
+
+            // Determine which side to move to based on relative position
+            if (finalTextX < placed.x) {
+                // Colliding annotation is to the right, so move left
+                drawToSide = 'left';
+                finalTextX = boxX - halfWidth - sideOffset;
+                finalTextY = boxY + (boxHeight / 2) - (totalTextHeight / 2);
+            } else {
+                // Colliding annotation is to the left, so move right
+                drawToSide = 'right';
+                finalTextX = boxX + boxWidth + halfWidth + sideOffset;
+                finalTextY = boxY + (boxHeight / 2) - (totalTextHeight / 2);
+            }
+            break; // Only handle first collision
+        }
+    }
+
+    // Edge detection - keep text on-screen horizontally
+    if (finalTextX - halfWidth < 10) {
+        finalTextX = 10 + halfWidth;
+    }
+    if (finalTextX + halfWidth > canvas.width - 10) {
+        finalTextX = canvas.width - 10 - halfWidth;
+    }
+
+    // Bottom guard - clamp to canvas if it would go off the bottom
+    if (finalTextY + totalTextHeight > canvas.height - 10) {
+        finalTextY = canvas.height - 10 - totalTextHeight;
+    }
+
+    // Top guard (final check after collision detection)
+    if (finalTextY < 10) {
+        finalTextY = 10;
+    }
+
+    // Record this annotation's position for future collision checks
+    placedAnnotations.push({
+        x: finalTextX,
+        y: finalTextY,
+        halfWidth: halfWidth,
+        height: totalTextHeight
+    });
+
+    // Draw connecting line
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+
+    ctx.beginPath();
+    if (drawToSide === 'left') {
+        // Line from right side of text to left side of box
+        ctx.moveTo(finalTextX + halfWidth, finalTextY + totalTextHeight / 2);
+        ctx.lineTo(boxX, boxY + boxHeight / 2);
+    } else if (drawToSide === 'right') {
+        // Line from left side of text to right side of box
+        ctx.moveTo(finalTextX - halfWidth, finalTextY + totalTextHeight / 2);
+        ctx.lineTo(boxX + boxWidth, boxY + boxHeight / 2);
+    } else if (drawBelow) {
+        // Line from top of text to bottom of box
+        ctx.moveTo(finalTextX, finalTextY);
+        ctx.lineTo(boxX + boxWidth / 2, boxY + boxHeight);
+    } else {
+        // Line from bottom of text to top of box
+        ctx.moveTo(finalTextX, finalTextY + totalTextHeight);
+        ctx.lineTo(boxX + boxWidth / 2, boxY);
+    }
+    ctx.stroke();
+
+    ctx.setLineDash([]); // Reset dash pattern
+
+    // Draw text with shadow for readability
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const lineY = finalTextY + (i * lineHeight);
+        ctx.fillText(lines[i], finalTextX, lineY);
+    }
+
+    ctx.restore();
+}
+
+/**
  * Draw a saved box from eternal coordinates (time/frequency)
  * EXACT COPY of orange box coordinate conversion logic!
  */
@@ -1330,7 +1592,7 @@ function drawSavedBox(ctx, box) {
     // Convert times to X positions (DEVICE PIXELS) - EXACT COPY of orange box logic!
     const startTimestamp = new Date(box.startTime);
     const endTimestamp = new Date(box.endTime);
-    
+
     // Use EXACT same interpolated time range as spectrogram elastic stretching!
     const interpolatedRange = getInterpolatedTimeRange();
     const displayStartMs = interpolatedRange.startTime.getTime();

@@ -272,7 +272,7 @@ export function enableFetchButton() {
     const volcanoSelect = document.getElementById('volcano');
     const currentVolcano = volcanoSelect ? volcanoSelect.value : null;
     const volcanoWithData = State.volcanoWithData;
-    
+
     // If we're on the volcano that already has data, keep fetch button disabled
     if (volcanoWithData && currentVolcano === volcanoWithData) {
         fetchBtn.disabled = true;
