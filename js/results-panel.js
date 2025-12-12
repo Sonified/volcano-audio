@@ -34,6 +34,9 @@ export async function initResultsPanel() {
         // Setup event listeners
         setupEventListeners();
 
+        // Setup listener for data fetch completion to inject regions
+        setupRegionInjectionListener();
+
     } catch (error) {
         console.error('❌ Error loading participant data:', error);
         alert('Failed to load participant data. Check console for details.');
@@ -174,14 +177,54 @@ async function loadSession(session) {
         // Display session info
         displaySessionInfo(session);
 
-        // TODO: Load the actual session data into the UI
-        // This will involve:
-        // 1. Setting volcano, station, duration from session data
-        // 2. Fetching the seismic data from R2
-        // 3. Loading regions and features onto the spectrogram
+        // 1. Set volcano dropdown
+        const volcanoSelect = document.getElementById('volcano');
+        if (volcanoSelect) {
+            volcanoSelect.value = session.volcano;
+            console.log(`✅ Set volcano to: ${session.volcano}`);
+        }
 
-        // For now, just show the info
-        alert(`Session loaded!\n\nVolcano: ${session.volcano}\nDate: ${session.date}\nRegions: ${session.region_count}\nFeatures: ${session.feature_count}\n\nNext step: Wire up to fetch seismic data and display regions.`);
+        // 2. Load stations for this volcano (auto-selects default station)
+        const { loadStations } = await import('./ui-controls.js');
+        loadStations();
+
+        // 3. Set duration dropdown
+        const durationSelect = document.getElementById('duration');
+        if (durationSelect) {
+            durationSelect.value = session.duration.toString();
+            console.log(`✅ Set duration to: ${session.duration} hours`);
+        }
+
+        // 5. Set highpass filter
+        const highpassInput = document.getElementById('highpassFreq');
+        if (highpassInput) {
+            highpassInput.value = session.highpass_freq || '2';
+            console.log(`✅ Set highpass to: ${session.highpass_freq} Hz`);
+        }
+
+        // 6. Set normalize checkbox
+        const normalizeCheckbox = document.getElementById('enableNormalize');
+        if (normalizeCheckbox) {
+            normalizeCheckbox.checked = session.enable_normalize;
+            console.log(`✅ Set normalize to: ${session.enable_normalize}`);
+        }
+
+        // 7. Store regions for loading after data fetch
+        window.pendingSessionRegions = session.regions;
+        console.log(`📦 Stored ${session.region_count} regions for loading after fetch`);
+
+        // 8. Store fetch timestamp to override time calculation
+        window.sessionFetchTimestamp = session.fetch_timestamp;
+        console.log(`📅 Using session fetch timestamp: ${session.fetch_timestamp}`);
+
+        // 9. Click the fetch button to load data (emulate normal fetch behavior)
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            console.log('🚀 Triggering data fetch...');
+            startBtn.click();
+        } else {
+            console.error('❌ Fetch button not found');
+        }
 
     } catch (error) {
         console.error('❌ Error loading session:', error);
@@ -213,6 +256,132 @@ function hideSessionInfo() {
     if (sessionInfo) {
         sessionInfo.style.display = 'none';
     }
+}
+
+/**
+ * Setup listener to inject regions after data fetch completes
+ */
+function setupRegionInjectionListener() {
+    // Poll for when data is loaded and we have pending regions to inject
+    const checkInterval = setInterval(async () => {
+        // Check if we have pending regions and data is loaded
+        if (!window.pendingSessionRegions) return;
+
+        // Import State to check data times
+        const State = await import('./audio-state.js');
+        if (!State.dataStartTime || !State.dataEndTime) return;
+
+        // Import zoomState to check if initialized
+        const { zoomState } = await import('./zoom-state.js');
+        if (!zoomState.isInitialized()) return;
+
+        // All conditions met - inject regions!
+        clearInterval(checkInterval);
+        console.log(`🎯 Injecting ${window.pendingSessionRegions.length} regions from session data`);
+
+        await injectSessionRegions(window.pendingSessionRegions);
+
+        // Clear pending regions
+        window.pendingSessionRegions = null;
+    }, 100); // Check every 100ms
+}
+
+/**
+ * Inject regions from session data into the spectrogram
+ */
+async function injectSessionRegions(sessionRegions) {
+    const audioState = await import('./audio-state.js');
+    const { zoomState } = await import('./zoom-state.js');
+    const { getCurrentRegions, getCurrentVolcano, updateCompleteButtonState, renderRegionsAfterCrossfade } = await import('./region-tracker.js');
+
+    const volcano = getCurrentVolcano();
+    if (!volcano) {
+        console.error('❌ Cannot inject regions - no volcano selected');
+        return;
+    }
+
+    const dataStartMs = audioState.dataStartTime.getTime();
+    const dataEndMs = audioState.dataEndTime.getTime();
+
+    // Get current regions array (reference to array in Map)
+    const regions = getCurrentRegions();
+
+    // Clear existing regions
+    regions.length = 0;
+
+    let regionId = 1;
+
+    for (const sessionRegion of sessionRegions) {
+        // Parse region timestamps
+        const regionStartMs = new Date(sessionRegion.regionStartTime).getTime();
+        const regionEndMs = new Date(sessionRegion.regionEndTime).getTime();
+
+        // Clamp to data bounds
+        const clampedStartMs = Math.max(regionStartMs, dataStartMs);
+        const clampedEndMs = Math.min(regionEndMs, dataEndMs);
+
+        // Calculate sample indices
+        const regionStartSeconds = (clampedStartMs - dataStartMs) / 1000;
+        const regionEndSeconds = (clampedEndMs - dataStartMs) / 1000;
+        const startSample = zoomState.timeToSample(regionStartSeconds);
+        const endSample = zoomState.timeToSample(regionEndSeconds);
+
+        // Convert features
+        const features = [];
+        let featureId = 1;
+
+        for (const sessionFeature of sessionRegion.features || []) {
+            // Parse feature timestamps
+            const featureStartMs = new Date(sessionFeature.featureStartTime).getTime();
+            const featureEndMs = new Date(sessionFeature.featureEndTime).getTime();
+
+            // Clamp to region bounds
+            const clampedFeatureStartMs = Math.max(featureStartMs, clampedStartMs);
+            const clampedFeatureEndMs = Math.min(featureEndMs, clampedEndMs);
+
+            // Calculate sample indices
+            const featureStartSeconds = (clampedFeatureStartMs - dataStartMs) / 1000;
+            const featureEndSeconds = (clampedFeatureEndMs - dataStartMs) / 1000;
+            const featureStartSample = zoomState.timeToSample(featureStartSeconds);
+            const featureEndSample = zoomState.timeToSample(featureEndSeconds);
+
+            features.push({
+                id: featureId++,
+                startSample: featureStartSample,
+                endSample: featureEndSample,
+                startTime: sessionFeature.featureStartTime,
+                endTime: sessionFeature.featureEndTime,
+                lowFreq: parseFloat(sessionFeature.lowFreq),
+                highFreq: parseFloat(sessionFeature.highFreq),
+                type: sessionFeature.type || '',
+                repetition: sessionFeature.repetition || '',
+                notes: sessionFeature.notes || '',
+                speedFactor: sessionFeature.speedFactor || 1,
+                numberOfEvents: sessionFeature.numberOfEvents || 1
+            });
+        }
+
+        // Create region object and add to array
+        regions.push({
+            id: regionId++,
+            startSample: startSample,
+            endSample: endSample,
+            startTime: new Date(clampedStartMs).toISOString(),
+            stopTime: new Date(clampedEndMs).toISOString(),
+            features: features,
+            expanded: false // Start collapsed
+        });
+    }
+
+    console.log(`✅ Injected ${regions.length} regions with ${regions.reduce((sum, r) => sum + r.features.length, 0)} total features`);
+
+    // Update button state
+    updateCompleteButtonState();
+
+    // Render regions (will be handled by crossfade completion normally)
+    renderRegionsAfterCrossfade();
+
+    console.log('🎨 Regions ready for rendering');
 }
 
 /**

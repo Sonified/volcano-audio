@@ -46,7 +46,7 @@ const STORAGE_KEY_PREFIX = 'volcano_audio_regions_';
 /**
  * Get the current volcano from the UI
  */
-function getCurrentVolcano() {
+export function getCurrentVolcano() {
     const volcanoSelect = document.getElementById('volcano');
     return volcanoSelect ? volcanoSelect.value : null;
 }
@@ -3782,7 +3782,7 @@ export async function updateCompleteButtonState() {
     
     // 🎓 CRITICAL: Check if tutorial is IN PROGRESS - if so, don't touch button at all!
     const { isTutorialInProgress } = await import('./study-workflow.js');
-    
+
     if (isTutorialInProgress()) {
         // Tutorial in progress - don't touch button, let tutorial control visibility
         if (!isStudyMode()) {
@@ -3790,7 +3790,20 @@ export async function updateCompleteButtonState() {
         }
         return; // Exit early, let tutorial control it
     }
-    
+
+    // 📊 RESULTS MODE: Keep Begin Analysis button disabled for results2025 user
+    const { getParticipantId } = await import('./qualtrics-api.js');
+    const participantId = getParticipantId();
+    if (participantId && participantId.toLowerCase() === 'results2025') {
+        completeBtn.style.display = 'flex';
+        completeBtn.style.alignItems = 'center';
+        completeBtn.style.justifyContent = 'center';
+        completeBtn.disabled = true;
+        completeBtn.style.opacity = '0.5';
+        completeBtn.style.cursor = 'not-allowed';
+        return; // Exit early, keep button disabled
+    }
+
     // Not in tutorial - ensure button is visible
     completeBtn.style.display = 'flex';
     completeBtn.style.alignItems = 'center';

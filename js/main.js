@@ -615,13 +615,23 @@ export async function startStreaming(event) {
         }
         
         // Calculate estimated end time
-        const now = new Date();
+        // If loading a session from results panel, use the stored fetch timestamp
+        let now;
+        if (window.sessionFetchTimestamp) {
+            now = new Date(window.sessionFetchTimestamp);
+            console.log(`📅 ${logTime()} Using session timestamp: ${window.sessionFetchTimestamp}`);
+            // Clear it after using so next fetch uses current time
+            delete window.sessionFetchTimestamp;
+        } else {
+            now = new Date();
+        }
+
         const currentMinute = now.getUTCMinutes();
         const currentSecond = now.getUTCSeconds();
         const currentPeriodStart = Math.floor(currentMinute / 10) * 10;
         const minutesSincePeriodStart = currentMinute - currentPeriodStart;
         const secondsSincePeriodStart = minutesSincePeriodStart * 60 + currentSecond;
-        
+
         let estimatedEndTime;
         if (secondsSincePeriodStart >= 135) {
             estimatedEndTime = new Date(now.getTime());
@@ -630,7 +640,7 @@ export async function startStreaming(event) {
             estimatedEndTime = new Date(now.getTime());
             estimatedEndTime.setUTCMinutes(currentPeriodStart - 10, 0, 0);
         }
-        
+
         const startTime = new Date(estimatedEndTime.getTime() - duration * 3600 * 1000);
         
         // Only log in dev/personal modes, not study mode
@@ -1061,13 +1071,21 @@ async function updateParticipantIdDisplay() {
     if (participantId && participantId.toLowerCase() === 'results2025') {
         const { showResultsPanel } = await import('./ui-controls.js');
         await showResultsPanel();
-        // Change page title for results user
-        document.title = 'Study Results';
+        // Change page title and header for results user
+        document.title = '🌋 Study Results';
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) {
+            pageTitle.textContent = 'Volcano Audification Study Results';
+        }
     } else {
         const { hideResultsPanel } = await import('./ui-controls.js');
         hideResultsPanel();
-        // Reset page title
+        // Reset page title and header
         document.title = 'Volcano Audification Study';
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) {
+            pageTitle.textContent = 'Volcano Audification Study';
+        }
     }
 }
 
