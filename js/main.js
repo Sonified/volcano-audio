@@ -1072,10 +1072,10 @@ async function updateParticipantIdDisplay() {
         const { showResultsPanel } = await import('./ui-controls.js');
         await showResultsPanel();
         // Change page title and header for results user
-        document.title = '🌋 Study Results';
+        document.title = 'Pilot Study Results';
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
-            pageTitle.textContent = 'Volcano Audification Study Results';
+            pageTitle.textContent = 'Volcano Audification Pilot Study Results';
         }
     } else {
         const { hideResultsPanel } = await import('./ui-controls.js');
