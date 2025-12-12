@@ -1272,7 +1272,12 @@ async function initializeApp() {
         case AppMode.STUDY_W2_S1:
         case AppMode.STUDY_W2_S1_RETURNING:
         case AppMode.STUDY_W2_S2:
-            await initializeStudyMode();
+            // Skip study workflow for results2025 user
+            if (isStudyMode()) {
+                await initializeStudyMode();
+            } else {
+                console.log('✅ Production mode initialized (study workflow skipped for results user)');
+            }
             break;
             
         case AppMode.TUTORIAL_END:
