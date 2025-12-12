@@ -258,8 +258,15 @@ export function isDevMode() {
 }
 
 export function isStudyMode() {
-    return CURRENT_MODE === AppMode.PRODUCTION || 
-           CURRENT_MODE === AppMode.STUDY_CLEAN || 
+    // Skip study mode for results2025 user (admin/results access)
+    // Check localStorage directly to avoid circular dependency
+    const participantId = localStorage.getItem('participantId');
+    if (participantId && participantId.toLowerCase() === 'results2025') {
+        return false;
+    }
+
+    return CURRENT_MODE === AppMode.PRODUCTION ||
+           CURRENT_MODE === AppMode.STUDY_CLEAN ||
            CURRENT_MODE === AppMode.STUDY_W2_S1 ||
            CURRENT_MODE === AppMode.STUDY_W2_S1_RETURNING ||
            CURRENT_MODE === AppMode.STUDY_W2_S2;
