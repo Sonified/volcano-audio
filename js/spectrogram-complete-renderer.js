@@ -762,17 +762,17 @@ export async function updateElasticFriendInBackground() {
         console.log(`🏠 Updating elastic friend in background with ${State.frequencyScale} scale...`);
     }
     const startTime = performance.now();
-    
+
     try {
         // Use existing render function with forceFullView=true to bypass region check
         // skipViewportUpdate=true so we don't touch the display
         await renderCompleteSpectrogram(true, true);
-        
+
         if (!isStudyMode()) {
             const elapsed = performance.now() - startTime;
             console.log(`🏠 Elastic friend updated in background (${elapsed.toFixed(0)}ms) - ready for zoom out!`);
         }
-        
+
     } catch (error) {
         console.error('❌ Error updating elastic friend in background:', error);
     }
