@@ -1051,11 +1051,22 @@ async function updateParticipantIdDisplay() {
     const participantId = getParticipantId();
     const displayElement = document.getElementById('participantIdDisplay');
     const valueElement = document.getElementById('participantIdValue');
-    
+
     // Always show the participant ID display (even if no ID set)
     // This allows users to see and click to enter their ID
     if (displayElement) displayElement.style.display = 'block';
     if (valueElement) valueElement.textContent = participantId || '--';
+
+    // Check if username is "results2025" - show results panel
+    const resultsPanel = document.getElementById('resultsPanel');
+    if (resultsPanel) {
+        if (participantId && participantId.toLowerCase() === 'results2025') {
+            resultsPanel.style.display = 'block';
+            console.log('📊 Results panel shown for results user');
+        } else {
+            resultsPanel.style.display = 'none';
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2210,7 +2221,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     } else {
         console.warn('⚠️ Begin Analysis button (completeBtn) not found in DOM');
     }
-    
+
+    // View Results button - opens Volcano_Study_Outcomes.html
+    const viewResultsBtn = document.getElementById('viewResultsBtn');
+    if (viewResultsBtn) {
+        viewResultsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('📊 View Results button clicked - opening Volcano_Study_Outcomes.html');
+            window.open('Qualtrics/analysis/Volcano_Study_Outcomes.html', '_blank');
+        });
+    }
+
     // Listen for confirmation to proceed with workflow
     window.addEventListener('beginAnalysisConfirmed', async () => {
         // Mark tutorial as completed (Begin Analysis was clicked) - PERSISTENT flag

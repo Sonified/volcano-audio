@@ -2678,7 +2678,7 @@ export function closeMissingStudyIdModal(keepOverlay = null) {
 
 export function submitParticipantSetup() {
     const participantId = document.getElementById('participantId').value.trim();
-    
+
     // Save to localStorage for persistence across sessions
     if (participantId) {
         storeParticipantId(participantId);
@@ -2688,23 +2688,32 @@ export function submitParticipantSetup() {
         localStorage.removeItem('participantId');
         console.log('🗑️ Removed participant ID from storage');
     }
-    
+
     console.log('📝 Participant Setup:');
     console.log('  - Participant ID:', participantId || '(none)');
     console.log('  - Timestamp:', new Date().toISOString());
-    
+
     const statusEl = document.getElementById('status');
     statusEl.className = 'status success';
     statusEl.textContent = `✅ ID recorded`;
-    
+
     // Update participant ID display in top panel
     // Always show the display (even if no ID set) so users can click to enter their ID
     const displayElement = document.getElementById('participantIdDisplay');
     const valueElement = document.getElementById('participantIdValue');
-    
+
     if (displayElement) displayElement.style.display = 'block';
     if (valueElement) valueElement.textContent = participantId || '--';
-    
+
+    // 🔍 Check if username is "results2025" - show results panel
+    if (participantId && participantId.toLowerCase() === 'results2025') {
+        console.log('📊 Results user detected - showing results panel');
+        showResultsPanel();
+    } else {
+        // Hide results panel if it exists and user is not "results2025"
+        hideResultsPanel();
+    }
+
     // 🔥 REMOVED: Don't manually hide modal or fade overlay
     // Let the button handler and ModalManager do their job!
     // The workflow is waiting for the modal to properly close through ModalManager.
@@ -3848,5 +3857,27 @@ export function resetWaveformFilterToDefault() {
     const slider = document.getElementById('waveformFilterSlider');
     slider.value = 50;
     changeWaveformFilter();
+}
+
+/**
+ * Show results panel for admin/results user
+ */
+export function showResultsPanel() {
+    const resultsPanel = document.getElementById('resultsPanel');
+    if (resultsPanel) {
+        resultsPanel.style.display = 'block';
+        console.log('📊 Results panel shown');
+    }
+}
+
+/**
+ * Hide results panel
+ */
+export function hideResultsPanel() {
+    const resultsPanel = document.getElementById('resultsPanel');
+    if (resultsPanel) {
+        resultsPanel.style.display = 'none';
+        console.log('📊 Results panel hidden');
+    }
 }
 

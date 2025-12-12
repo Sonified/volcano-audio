@@ -1,0 +1,43 @@
+{
+  "timestamp": "2025-12-12T02:24:45.836096+00:00",
+  "results": [
+    {
+      "station": "HV.OBL",
+      "volcano": "kilauea",
+      "r2_ttfa_ms": 427.2730350494385,
+      "railway_ttfa_ms": 106659.95407104492,
+      "speedup": 249.62949992550693
+    },
+    {
+      "station": "HV.MOKD",
+      "volcano": "maunaloa",
+      "r2_ttfa_ms": 407.00697898864746,
+      "railway_ttfa_ms": 89350.24619102478,
+      "speedup": 219.53001005792828
+    },
+    {
+      "station": "AV.GSTD",
+      "volcano": "greatsitkin",
+      "r2_ttfa_ms": 354.3829917907715,
+      "railway_ttfa_ms": 42229.14409637451,
+      "speedup": 119.16244592603556
+    },
+    {
+      "station": "AV.SSLS",
+      "volcano": "shishaldin",
+      "r2_ttfa_ms": 414.1840934753418,
+      "railway_ttfa_ms": 56889.51110839844,
+      "speedup": 137.35320116001827
+    },
+    {
+      "station": "AV.SPCP",
+      "volcano": "spurr",
+      "r2_ttfa_ms": 432.7888488769531,
+      "railway_ttfa_ms": 37746.15406990051,
+      "speedup": 87.21609664354402
+    }
+  ],
+  "avg_r2_ttfa_ms": 407.12718963623047,
+  "avg_railway_ttfa_ms": 66575.00190734863,
+  "avg_speedup": 163.5238412026316
+}
