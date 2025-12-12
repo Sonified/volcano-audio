@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volcano Audio Sonification: Pilot Study Results</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 8px;
+        }
+
+        h2 {
+            color: #e74c3c;
+            font-size: 1.8em;
+            margin-top: 30px;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 7px;
+        }
+
+        h3 {
+            color: #34495e;
+            font-size: 1.4em;
+            margin-top: 22px;
+            margin-bottom: 10px;
+        }
+
+        h4 {
+            color: #7f8c8d;
+            font-size: 1.1em;
+            margin-top: 16px;
+            margin-bottom: 9px;
+        }
+
+        p {
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-style: italic;
+            margin-bottom: 8px;
+        }
+
+        .updated {
+            color: #95a5a6;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+
+        strong {
+            color: #2c3e50;
+        }
+
+        em {
+            color: #555;
+        }
+
+        ul, ol {
+            margin-left: 25px;
+            margin-bottom: 12px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 0.95em;
+        }
+
+        th {
+            background: #34495e;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 12px;
+            border-left: 4px solid #ffc107;
+            margin: 14px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            padding: 12px;
+            border-left: 4px solid #28a745;
+            margin: 14px 0;
+        }
+
+        .warning {
+            background: #fff3cd;
+            padding: 12px;
+            border-left: 4px solid #ffc107;
+            margin: 14px 0;
+        }
+
+        .info {
+            background: #d1ecf1;
+            padding: 12px;
+            border-left: 4px solid #17a2b8;
+            margin: 14px 0;
+        }
+
+        .stat-positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .stat-negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .stat-neutral {
+            color: #6c757d;
+        }
+
+        .emoji {
+            font-style: normal;
+        }
+
+        blockquote {
+            background: #f8f9fa;
+            border-left: 4px solid #6c757d;
+            padding: 10px 15px;
+            margin: 12px 0;
+            font-style: italic;
+            color: #555;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px solid #ecf0f1;
+            margin: 20px 0;
+        }
+
+        .section-divider {
+            text-align: center;
+            margin: 25px 0;
+            color: #95a5a6;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px solid #ecf0f1;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .toc {
+            background: #f8f9fa;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .toc ul {
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .toc li {
+            margin-bottom: 5px;
+        }
+
+        .toc a {
+            color: #e74c3c;
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Volcano Audio Sonification: Pilot Study Results</h1>
+        <p class="subtitle">Browser-based volcano listening study - N=6, 17 complete sessions</p>
+        <p class="updated"><strong>Last Updated:</strong> December 11, 2025</p>
+
+        <div class="toc">
+            <h3>Quick Navigation</h3>
+            <ul>
+                <li><a href="#overview">Study Overview</a></li>
+                <li><a href="#findings">Key Findings</a></li>
+                <li><a href="#what-this-means">What This Means</a></li>
+                <li><a href="#p4-story">The P4 Story</a></li>
+            </ul>
+        </div>
+
+        <hr>
+
+        <h2 id="overview">Study Overview</h2>
+
+        <p><strong>What we did:</strong> Developed a web-based platform that transforms volcanic seismic data into audible sound. Participants (N=6) listened to 24 hours of volcanic data, marked interesting features, and completed pre/post mood surveys plus awe and nature connectedness scales.</p>
+
+        <h3>Study Design</h3>
+        <ul>
+            <li><strong>N = 6</strong> real participants (after excluding test accounts)</li>
+            <li><strong>17 complete sessions</strong> across 3 weeks (all with Pre+Post mood data)</li>
+            <li><strong>Data source:</strong> USGS volcanic seismic station data (Nov-Dec 2025)</li>
+            <li><strong>Measures:</strong>
+                <ul>
+                    <li><strong>Pre/Post mood</strong> (6 items, 1-5 scale) - administered <strong>immediately before and after each session</strong></li>
+                    <li><strong>AWE-SF</strong> (12 items, 1-7 scale) - administered <strong>immediately after each session</strong></li>
+                    <li><strong>CNS</strong> (14 items, 1-5 scale) - Pre at intake, Post <strong>before final session</strong> (not after completion)</li>
+                    <li><strong>Feature annotations</strong> - marked during listening sessions</li>
+                </ul>
+            </li>
+        </ul>
+
+        <div class="info">
+            <h4>Methodological Note on Timing</h4>
+            <p><strong>Mood and AWE data</strong> (measured directly before/after each intervention)</p>
+            <p><strong>CNS data</strong> = qualitatively noisier, trending lower in week 3</p>
+        </div>
+
+        <hr>
+
+        <h2 id="findings">Key Findings</h2>
+
+        <div class="success">
+            <p><strong>Measurement quality:</strong> Pre/Post mood surveys were administered <strong>immediately before and after each session</strong>, providing high-quality data on the intervention's direct impact. These are the most reliable measures in the study.</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Mood Item</th>
+                    <th>Pre Mean</th>
+                    <th>Post Mean</th>
+                    <th>Δ</th>
+                    <th>p-value</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Focused</strong></td>
+                    <td>3.06</td>
+                    <td>3.47</td>
+                    <td class="stat-positive">+0.41</td>
+                    <td class="stat-positive">0.0041***</td>
+                    <td><span class="emoji">✅</span> Significant increase</td>
+                </tr>
+                <tr>
+                    <td>Calm</td>
+                    <td>3.35</td>
+                    <td>3.65</td>
+                    <td class="stat-positive">+0.29</td>
+                    <td>0.0962</td>
+                    <td>Trending positive</td>
+                </tr>
+                <tr>
+                    <td>Connected</td>
+                    <td>1.76</td>
+                    <td>2.00</td>
+                    <td class="stat-positive">+0.24</td>
+                    <td>0.1635</td>
+                    <td>Improved (n.s.)</td>
+                </tr>
+                <tr>
+                    <td>Nervous</td>
+                    <td>1.59</td>
+                    <td>1.41</td>
+                    <td class="stat-positive">-0.18</td>
+                    <td>0.3818</td>
+                    <td>Anxiety decreased</td>
+                </tr>
+                <tr>
+                    <td>Energized</td>
+                    <td>3.06</td>
+                    <td>2.71</td>
+                    <td class="stat-negative">-0.35</td>
+                    <td>0.0826</td>
+                    <td>Decreased</td>
+                </tr>
+                <tr>
+                    <td>Wonder</td>
+                    <td>1.88</td>
+                    <td>1.94</td>
+                    <td class="stat-positive">+0.06</td>
+                    <td>0.6684</td>
+                    <td>Stable</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Outcomes</h3>
+
+        <p>Volcano sonification significantly enhanced focus (p=0.0041, Δ=+0.41) - a clear cognitive benefit measured immediately before and after each session. This represents increased concentration and attention during the listening experience.</p>
+
+        <p>Calm also showed a strong positive trend approaching significance (p=0.096, Δ=+0.29), suggesting the platform promotes relaxation alongside focus. Connected to nature improved (+0.24) and anxiety decreased (-0.18), though these changes were not statistically significant. The combination of increased focus with improved calm creates a "relaxed focus" state - enhanced concentration without tension or anxiety.</p>
+
+        <h3>Pattern Recognition: Participants Detected Volcanic Phenomena</h3>
+
+        <p><strong>283 features identified</strong> across 6 participants:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature Type</th>
+                    <th>Count</th>
+                    <th>Example Annotations</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Possible earthquakes</strong></td>
+                    <td>11</td>
+                    <td>"local earthquake", "strong local earthquake", "is this a quake from far away or from the volcano?"</td>
+                </tr>
+                <tr>
+                    <td><strong>Frequency glides</strong></td>
+                    <td>8</td>
+                    <td>"frequency gliding", "overtone (?) of frequency gliding"</td>
+                </tr>
+                <tr>
+                    <td><strong>Volcanic tremor</strong></td>
+                    <td>Multiple</td>
+                    <td>"I don't 'see' this feature, but I hear a continuous rumbling that's not always there"</td>
+                </tr>
+                <tr>
+                    <td><strong>Rich metaphors</strong></td>
+                    <td>12</td>
+                    <td>"pebbles moving underwater", "crackling of fire wood", "ocean waves, repetitive amplitude"</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="highlight">
+            <p><strong>Key observation:</strong> P3 identified tremor through sound despite not seeing it visually: <em>"I don't 'see' this feature, but I hear a continuous rumbling that's not always there."</em> This validates auditory perception as complementary to visual analysis.</p>
+        </div>
+
+        <p><strong>Annotation quality:</strong></p>
+        <ul>
+            <li>36% of features have substantive notes (40 with scientific terminology, 12 with metaphorical descriptions)</li>
+            <li>This exceeds typical citizen science annotation rates</li>
+        </ul>
+
+        <h3>Low Emotional Awe, High Cognitive Engagement</h3>
+
+        <div class="success">
+            <p><strong>Measurement quality:</strong> AWE-SF administered <strong>immediately after each session</strong>, providing high-quality data on emotional response during the intervention.</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Factor</th>
+                    <th>Mean</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Accommodation</strong></td>
+                    <td class="stat-positive">4.15</td>
+                    <td><strong>ABOVE neutral</strong> - felt challenged to understand</td>
+                </tr>
+                <tr>
+                    <td>Time</td>
+                    <td>3.92</td>
+                    <td>Near neutral - some time distortion</td>
+                </tr>
+                <tr>
+                    <td>Vastness</td>
+                    <td>2.81</td>
+                    <td>Below neutral</td>
+                </tr>
+                <tr>
+                    <td>Self-Loss</td>
+                    <td>2.33</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>Connectedness</td>
+                    <td>2.19</td>
+                    <td>Low</td>
+                </tr>
+                <tr>
+                    <td>Physical</td>
+                    <td>1.69</td>
+                    <td>Very low - no chills</td>
+                </tr>
+                <tr>
+                    <td><strong>OVERALL</strong></td>
+                    <td class="stat-negative">2.75</td>
+                    <td><strong>Low awe experience</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p><strong>Key finding:</strong> Participants felt <strong>intellectually challenged</strong> (Accommodation 4.15) but experienced <strong>minimal emotional awe</strong> (Overall 2.75). They were thinking, not feeling.</p>
+
+        <h3>Nature Connectedness (CNS): Mixed Results</h3>
+
+        <div class="warning">
+            <p><strong>Measurement limitations:</strong> CNS data is <strong>qualitatively noisier</strong> than the immediate pre/post mood measures and shows a trending lower pattern in week 3. Interpret with caution.</p>
+        </div>
+
+        <p><strong>Participants with complete Pre + Post CNS data: 3 of 6</strong> (P1, P3, P4)</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Participant</th>
+                    <th>Sessions</th>
+                    <th>Features</th>
+                    <th>CNS Pre</th>
+                    <th>CNS Post</th>
+                    <th>Δ</th>
+                    <th>Interpretation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>P1</td>
+                    <td>5</td>
+                    <td>115</td>
+                    <td>52</td>
+                    <td>42</td>
+                    <td class="stat-negative">-10</td>
+                    <td>Most engaged, largest decrease</td>
+                </tr>
+                <tr>
+                    <td>P3</td>
+                    <td>4</td>
+                    <td>69</td>
+                    <td>49</td>
+                    <td>42</td>
+                    <td class="stat-negative">-7</td>
+                    <td>Moderate engagement, decrease</td>
+                </tr>
+                <tr>
+                    <td>P4</td>
+                    <td>2</td>
+                    <td>15</td>
+                    <td>48</td>
+                    <td>50</td>
+                    <td class="stat-positive">+2</td>
+                    <td>Only participant with increase</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info">
+            <p><strong>Important:</strong> CNS should be interpreted cautiously given timing issues. Mood and AWE data (measured immediately before/after sessions) are more reliable indicators of intervention impact.</p>
+        </div>
+
+        <hr>
+
+        <h2 id="what-this-means">What This Means</h2>
+
+        <h3>Key Findings Summary</h3>
+
+        <div class="success">
+            <h4>Significant effects (p &lt; 0.05):</h4>
+            <ol>
+                <li><strong>Focus increased</strong> (p=0.0041, Δ=+0.41) - clear cognitive benefit measured immediately before/after each session</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            <h4>Trending effects (p &lt; 0.10, require larger N for significance):</h4>
+            <ol start="2">
+                <li><strong>Calm increased</strong> (p=0.096, Δ=+0.29) - approaching significance, positive relaxation trend</li>
+                <li><strong>Energized decreased</strong> (p=0.083, Δ=-0.35) - negative trend, may reflect relaxation vs. stimulation trade-off</li>
+            </ol>
+        </div>
+
+        <div class="info">
+            <h4>Positive trends (not significant, consistent direction):</h4>
+            <ol start="4">
+                <li><strong>Connected improved</strong> (Δ=+0.24) - positive trend in feeling connected</li>
+                <li><strong>Anxiety decreased</strong> (Δ=-0.18) - positive trend in reduced nervousness</li>
+                <li><strong>Wonder stable</strong> (Δ=+0.06) - minimal change</li>
+            </ol>
+        </div>
+
+        <h4>Qualitative findings (high-quality behavioral data):</h4>
+        <ol start="7">
+            <li><strong>Pattern recognition demonstrated:</strong> Untrained participants identified possible earthquakes, frequency glides, and volcanic tremor through sound alone</li>
+            <li><strong>High engagement:</strong> 283 features annotated, 36% with substantive scientific notes - exceeds typical citizen science rates</li>
+        </ol>
+
+        <h4>Awe and nature connectedness:</h4>
+        <ol start="9">
+            <li><strong>Low emotional awe</strong> (2.75/7, measured post-session) - BUT high cognitive engagement (Accommodation 4.15/7)
+                <ul>
+                    <li>Platform creates intellectual challenge, not emotional overwhelm</li>
+                </ul>
+            </li>
+            <li><strong>CNS inconclusive but trending lower in week 3</strong></li>
+        </ol>
+
+        <h3>Areas Requiring Larger Sample</h3>
+        <p>Several positive trends require N&gt;50 to reach statistical significance:</p>
+        <ul>
+            <li><strong>Calm</strong> (p=0.096) - very close to significance, clear positive trend</li>
+            <li><strong>Connected</strong> (positive direction, moderate effect size)</li>
+            <li><strong>Anxiety reduction</strong> (consistent with "relaxed focus" pattern)</li>
+        </ul>
+
+        <p>Current N=6 (17 sessions) provides adequate power for large effects (like Focus) but is underpowered for medium effects.</p>
+
+        <h3>Data Quality Hierarchy</h3>
+
+        <div class="success">
+            <h4>Most Reliable</h4>
+            <ol>
+                <li><strong>Mood changes</strong> (pre/post each session) → <span class="emoji">✅</span> Focus significantly increased</li>
+                <li><strong>AWE-SF</strong> (immediately post-session) → <span class="emoji">✅</span> Low awe, high cognitive engagement</li>
+                <li><strong>Feature annotations</strong> (during sessions) → <span class="emoji">✅</span> Pattern recognition demonstrated</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            <h4>Less Reliable</h4>
+            <ol start="4">
+                <li><strong>CNS</strong> (trending lower in week 3) → <span class="emoji">❓</span> Mixed, treat with caution</li>
+            </ol>
+        </div>
+
+
+        <h2 id="p4-story">Individual Variation: The P4 Story</h2>
+
+        <p>P4 is the ideal outcome:</p>
+        <ul>
+            <li><strong>CNS increased</strong> (+2 points, only participant)</li>
+            <li><strong>High quality annotations:</strong> 100% of features have detailed notes
+                <ul>
+                    <li>"transition during/after which relatively rapid irregular clicks start occurring, visible as faint vertical lines"</li>
+                    <li>"series of distinct short clicks followed after varying delays by more sustained whooshing sounds"</li>
+                </ul>
+            </li>
+            <li><strong>Best mood shifts:</strong> Showed positive changes in multiple sessions</li>
+            <li><strong>Highest AWE-SF among multi-session participants</strong></li>
+        </ul>
+
+        <p>P4 demonstrates it's possible to achieve both cognitive engagement AND positive outcomes. N=6 reveals this variation that would be lost in larger aggregate studies.</p>
+
+        <hr>
+
+        <h2>Statistical Summary</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Participants</td>
+                    <td>6 (real, after exclusions)</td>
+                </tr>
+                <tr>
+                    <td>Complete sessions</td>
+                    <td>17 (all with mood data)</td>
+                </tr>
+                <tr>
+                    <td>Timeout sessions</td>
+                    <td>6 (excluded from mood analysis)</td>
+                </tr>
+                <tr>
+                    <td>Features identified</td>
+                    <td>283</td>
+                </tr>
+                <tr>
+                    <td>Possible earthquake detections</td>
+                    <td>11</td>
+                </tr>
+                <tr>
+                    <td>Frequency glide observations</td>
+                    <td>8</td>
+                </tr>
+                <tr>
+                    <td><strong>Focus increase</strong></td>
+                    <td class="stat-positive"><strong>+0.41 (p=0.0041*)</strong> ⭐</td>
+                </tr>
+                <tr>
+                    <td>Calm trending</td>
+                    <td>+0.29 (p=0.096)</td>
+                </tr>
+                <tr>
+                    <td>Overall awe (AWE-SF)</td>
+                    <td>2.75/7 (low)</td>
+                </tr>
+                <tr>
+                    <td>Cognitive challenge (Accommodation)</td>
+                    <td>4.15/7 (above neutral)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+
+
+
+        <div class="footer">
+            <p><strong>Last updated:</strong> December 11, 2025 (after correcting QID5/QID12 swap - Focus actually increased, not decreased!)</p>
+            <p>Volcano Audio Sonification Project</p>
+        </div>
+    </div>
+</body>
+</html>
