@@ -3862,11 +3862,23 @@ export function resetWaveformFilterToDefault() {
 /**
  * Show results panel for admin/results user
  */
-export function showResultsPanel() {
+let resultsPanelInitialized = false;
+export async function showResultsPanel() {
     const resultsPanel = document.getElementById('resultsPanel');
     if (resultsPanel) {
         resultsPanel.style.display = 'block';
         console.log('📊 Results panel shown');
+
+        // Initialize results panel on first show
+        if (!resultsPanelInitialized) {
+            resultsPanelInitialized = true;
+            try {
+                const { initResultsPanel } = await import('./results-panel.js');
+                await initResultsPanel();
+            } catch (error) {
+                console.error('❌ Error initializing results panel:', error);
+            }
+        }
     }
 }
 

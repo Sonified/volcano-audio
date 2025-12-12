@@ -61,9 +61,39 @@
             <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-weight: 700; font-size: 18px; color: #333;">📊 Study Results</span>
-                    <span style="font-size: 14px; color: #666;">Access participant data and analysis outcomes</span>
+                    <span style="font-size: 14px; color: #666;">Load participant sessions for analysis</span>
                 </div>
-                <button type="button" id="viewResultsBtn" style="padding: 10px 24px; font-size: 16px; font-weight: 600; min-width: auto; background: #28a745; border-color: #28a745; color: white; border-radius: 6px;">View Results</button>
+                <button type="button" id="viewResultsBtn" style="padding: 10px 24px; font-size: 16px; font-weight: 600; min-width: auto; background: #28a745; border-color: #28a745; color: white; border-radius: 6px;">View Outcomes</button>
+            </div>
+
+            <!-- Participant and Session Selection -->
+            <div style="display: flex; gap: 15px; align-items: end; margin-top: 15px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label for="participantSelect" style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #555;">Participant:</label>
+                    <select id="participantSelect" style="width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                        <option value="">Select participant...</option>
+                    </select>
+                </div>
+
+                <div style="flex: 1; min-width: 250px;">
+                    <label for="sessionSelect" style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #555;">Session:</label>
+                    <select id="sessionSelect" style="width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;" disabled>
+                        <option value="">Select session...</option>
+                    </select>
+                </div>
+
+                <button type="button" id="loadSessionBtn" style="padding: 8px 24px; font-size: 14px; font-weight: 600; min-width: auto; background: #007bff; border-color: #007bff; color: white; border-radius: 4px;" disabled>Load Session</button>
+            </div>
+
+            <!-- Session Info Display -->
+            <div id="sessionInfo" style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 4px; display: none; font-size: 13px; color: #333;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                    <div><strong>Volcano:</strong> <span id="infoVolcano">-</span></div>
+                    <div><strong>Date:</strong> <span id="infoDate">-</span></div>
+                    <div><strong>Regions:</strong> <span id="infoRegions">-</span></div>
+                    <div><strong>Features:</strong> <span id="infoFeatures">-</span></div>
+                    <div><strong>Duration:</strong> <span id="infoDuration">-</span> hours</div>
+                </div>
             </div>
         </div>
 
