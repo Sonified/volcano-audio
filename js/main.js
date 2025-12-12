@@ -1058,14 +1058,16 @@ async function updateParticipantIdDisplay() {
     if (valueElement) valueElement.textContent = participantId || '--';
 
     // Check if username is "results2025" - show results panel
-    const resultsPanel = document.getElementById('resultsPanel');
-    if (resultsPanel) {
-        if (participantId && participantId.toLowerCase() === 'results2025') {
-            resultsPanel.style.display = 'block';
-            console.log('📊 Results panel shown for results user');
-        } else {
-            resultsPanel.style.display = 'none';
-        }
+    if (participantId && participantId.toLowerCase() === 'results2025') {
+        const { showResultsPanel } = await import('./ui-controls.js');
+        await showResultsPanel();
+        // Change page title for results user
+        document.title = 'Study Results';
+    } else {
+        const { hideResultsPanel } = await import('./ui-controls.js');
+        hideResultsPanel();
+        // Reset page title
+        document.title = 'Volcano Audification Study';
     }
 }
 
