@@ -579,10 +579,10 @@ export async function changeFrequencyScale() {
 
                         if (!isStudyMode()) console.log('✅ Region scale transition complete (with fade)');
 
-                        // 🔥 FIX: DON'T update elastic friend here - it overwrites infiniteCanvas!
-                        // This causes viewport updates to draw the wrong view (full instead of region)
-                        // The elastic friend will be updated on-demand when user zooms out
-                        if (!isStudyMode()) console.log('🛑 Skipping elastic friend update to preserve region view in infiniteCanvas');
+                        // 🏠 PROACTIVE FIX: Re-render full spectrogram in background
+                        // So elastic friend is ready with new frequency scale when user zooms out
+                        console.log('🏠 Starting background render of full spectrogram for elastic friend...');
+                        updateElasticFriendInBackground();
                     }
                 };
                 

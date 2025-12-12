@@ -486,7 +486,11 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
             endSample: totalSamples,
             frequencyScale: State.frequencyScale
         };
-        // console.log(`🏛️ New self created: Full view (0-${totalSamples.toLocaleString()}), scale=${State.frequencyScale}`);
+        console.log(`🎨 infiniteCanvas UPDATED to FULL VIEW:`, {
+            startSample: 0,
+            endSample: totalSamples,
+            frequencyScale: State.frequencyScale
+        });
         
         // 🏠 STORE AS ELASTIC FRIEND (our source of truth for transitions!)
         cachedFullSpectrogramCanvas = tempCanvas;
@@ -623,6 +627,11 @@ export function restoreInfiniteCanvasFromCache() {
         endSample: State.completeSamplesArray ? State.completeSamplesArray.length : 0,
         frequencyScale: State.frequencyScale
     };
+    console.log(`🎨 infiniteCanvas RESTORED from elastic friend (FULL VIEW):`, {
+        startSample: 0,
+        endSample: State.completeSamplesArray ? State.completeSamplesArray.length : 0,
+        frequencyScale: State.frequencyScale
+    });
     
     // 🔥 THE FIX: Ring the doorbell! The butterfly is home!
     completeSpectrogramRendered = true;  // Mark spectrogram as rendered for animation system
@@ -1507,23 +1516,29 @@ export function getSpectrogramViewport(playbackRate) {
  * Update spectrogram viewport with GPU-accelerated stretching
  */
 export function updateSpectrogramViewport(playbackRate) {
+    // 🎯 DEBUG: Log every call
+    console.log(`🎨 updateSpectrogramViewport called (playbackRate=${playbackRate.toFixed(2)})`);
+    console.trace('📍 Call stack');
+
     // 🎯 DEBUG: Log if called during zoom out transition
     if (isZoomTransitionInProgress() && !getZoomDirection()) {
-        // const progress = getZoomTransitionProgress();
-        // console.error(`🔴🔴🔴 updateSpectrogramViewport called DURING ZOOM OUT! playbackRate=${playbackRate.toFixed(2)}, progress=${progress.toFixed(3)}`);
-        // console.trace('🔴 Stack trace for updateSpectrogramViewport during zoom out:');
-
-        // 🚨 CRITICAL: During zoom-out, DON'T touch the canvas!
-        // drawInterpolatedSpectrogram handles the entire transition
-        // console.log(`🛑 BLOCKING updateSpectrogramViewport during zoom-out (progress=${progress.toFixed(3)})`);
+        console.log(`🛑 BLOCKED: zoom-out transition in progress`);
         return;
     }
 
     // 🔧 FIX: Check if we're in a region and the infinite canvas contains the wrong view
     // This prevents the "zoom out flash" bug when changing frequency scale in region mode
     // and then clicking the waveform (which calls restoreViewportState)
-    const { zoomState } = State;
-    if (zoomState && zoomState.isInitialized() && zoomState.isInRegion()) {
+    // NOTE: zoomState is imported from zoom-state.js, not from State
+    const isInRegion = zoomState.isInitialized() && zoomState.isInRegion();
+
+    console.log(`🔍 Zoom state check:`, {
+        hasZoomState: !!zoomState,
+        isInitialized: zoomState.isInitialized(),
+        isInRegion: isInRegion
+    });
+
+    if (isInRegion) {
         // Get current region bounds
         const regionRange = zoomState.getRegionRange();
         const dataStartMs = State.dataStartTime ? State.dataStartTime.getTime() : 0;
@@ -1534,19 +1549,32 @@ export function updateSpectrogramViewport(playbackRate) {
         const regionStartSample = Math.floor(regionStartSeconds * originalSampleRate);
         const regionEndSample = Math.floor(regionEndSeconds * originalSampleRate);
 
+        console.log(`🔍 Region bounds:`, {
+            regionStartSample,
+            regionEndSample
+        });
+
+        console.log(`🔍 Infinite canvas bounds:`, {
+            infiniteStartSample: infiniteCanvasContext.startSample,
+            infiniteEndSample: infiniteCanvasContext.endSample,
+            totalSamples: State.completeSamplesArray?.length
+        });
+
         // Check if infinite canvas contains the region view or full view
         const infiniteContainsRegion =
             infiniteCanvasContext.startSample === regionStartSample &&
             infiniteCanvasContext.endSample === regionEndSample;
 
+        console.log(`🔍 Infinite canvas matches region?`, infiniteContainsRegion);
+
         if (!infiniteContainsRegion) {
             // Infinite canvas contains full view (elastic friend), not the current region
             // Don't update viewport - we want to keep showing the region view
-            if (!isStudyMode()) {
-                console.log(`🛑 Skipping viewport update: in region but infinite canvas contains full view`);
-            }
+            console.log(`🛑 BLOCKED: in region but infinite canvas contains full view`);
             return;
         }
+
+        console.log(`✅ PROCEEDING: infinite canvas has correct region view`);
     }
 
     if (!infiniteSpectrogramCanvas) {
@@ -2169,7 +2197,12 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
             endSample: endSample,
             frequencyScale: State.frequencyScale
         };
-        // console.log(`🏛️ New temple self created: Region (${startSample.toLocaleString()}-${endSample.toLocaleString()}), scale=${State.frequencyScale}`);
+        console.log(`🎨 infiniteCanvas UPDATED to REGION VIEW:`, {
+            startSample,
+            endSample,
+            frequencyScale: State.frequencyScale,
+            duration: `${((endSample - startSample) / (State.currentMetadata?.original_sample_rate || 50)).toFixed(2)}s`
+        });
         
         // logInfiniteCanvasState('renderCompleteSpectrogramForRegion COMPLETE - region canvas created');
         
