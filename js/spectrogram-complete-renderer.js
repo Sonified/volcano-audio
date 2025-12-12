@@ -48,6 +48,9 @@ let cachedZoomedSpectrogramCanvas = null;
 // Infinite canvas for GPU-accelerated viewport stretching
 let infiniteSpectrogramCanvas = null;
 
+// Track last playback rate used for viewport to detect rate changes
+let lastViewportPlaybackRate = 1.0;
+
 // Track the context of the current infinite canvas
 let infiniteCanvasContext = {
     startSample: null,
@@ -772,6 +775,22 @@ export async function updateElasticFriendInBackground() {
     }
     const startTime = performance.now();
 
+    // 🔥 FIX: Clone the current infinite canvas (region view) before rendering full view
+    // We must CLONE it because renderCompleteSpectrogram will destroy the original canvas
+    let clonedCanvas = null;
+    const savedContext = { ...infiniteCanvasContext };
+
+    if (infiniteSpectrogramCanvas && infiniteSpectrogramCanvas.width > 0) {
+        clonedCanvas = document.createElement('canvas');
+        clonedCanvas.width = infiniteSpectrogramCanvas.width;
+        clonedCanvas.height = infiniteSpectrogramCanvas.height;
+        const cloneCtx = clonedCanvas.getContext('2d');
+        cloneCtx.drawImage(infiniteSpectrogramCanvas, 0, 0);
+        if (!isStudyMode()) {
+            console.log(`🏠 Cloned region canvas: ${clonedCanvas.width}x${clonedCanvas.height}`);
+        }
+    }
+
     try {
         // Use existing render function with forceFullView=true to bypass region check
         // skipViewportUpdate=true so we don't touch the display
@@ -784,6 +803,17 @@ export async function updateElasticFriendInBackground() {
 
     } catch (error) {
         console.error('❌ Error updating elastic friend in background:', error);
+    } finally {
+        // 🔥 FIX: Restore the region view from the clone
+        // The elastic friend is now in cachedFullSpectrogramCanvas, but we need
+        // infiniteSpectrogramCanvas to remain the REGION view for display
+        if (clonedCanvas && clonedCanvas.width > 0) {
+            infiniteSpectrogramCanvas = clonedCanvas;
+            infiniteCanvasContext = savedContext;
+            if (!isStudyMode()) {
+                console.log(`🏠 Restored region view from clone (context: ${savedContext.startSample}-${savedContext.endSample})`);
+            }
+        }
     }
 }
 
@@ -1526,57 +1556,6 @@ export function updateSpectrogramViewport(playbackRate) {
         return;
     }
 
-    // 🔧 FIX: Check if we're in a region and the infinite canvas contains the wrong view
-    // This prevents the "zoom out flash" bug when changing frequency scale in region mode
-    // and then clicking the waveform (which calls restoreViewportState)
-    // NOTE: zoomState is imported from zoom-state.js, not from State
-    const isInRegion = zoomState.isInitialized() && zoomState.isInRegion();
-
-    console.log(`🔍 Zoom state check:`, {
-        hasZoomState: !!zoomState,
-        isInitialized: zoomState.isInitialized(),
-        isInRegion: isInRegion
-    });
-
-    if (isInRegion) {
-        // Get current region bounds
-        const regionRange = zoomState.getRegionRange();
-        const dataStartMs = State.dataStartTime ? State.dataStartTime.getTime() : 0;
-        const originalSampleRate = State.currentMetadata?.original_sample_rate || 50;
-
-        const regionStartSeconds = (regionRange.startTime.getTime() - dataStartMs) / 1000;
-        const regionEndSeconds = (regionRange.endTime.getTime() - dataStartMs) / 1000;
-        const regionStartSample = Math.floor(regionStartSeconds * originalSampleRate);
-        const regionEndSample = Math.floor(regionEndSeconds * originalSampleRate);
-
-        console.log(`🔍 Region bounds:`, {
-            regionStartSample,
-            regionEndSample
-        });
-
-        console.log(`🔍 Infinite canvas bounds:`, {
-            infiniteStartSample: infiniteCanvasContext.startSample,
-            infiniteEndSample: infiniteCanvasContext.endSample,
-            totalSamples: State.completeSamplesArray?.length
-        });
-
-        // Check if infinite canvas contains the region view or full view
-        const infiniteContainsRegion =
-            infiniteCanvasContext.startSample === regionStartSample &&
-            infiniteCanvasContext.endSample === regionEndSample;
-
-        console.log(`🔍 Infinite canvas matches region?`, infiniteContainsRegion);
-
-        if (!infiniteContainsRegion) {
-            // Infinite canvas contains full view (elastic friend), not the current region
-            // Don't update viewport - we want to keep showing the region view
-            console.log(`🛑 BLOCKED: in region but infinite canvas contains full view`);
-            return;
-        }
-
-        console.log(`✅ PROCEEDING: infinite canvas has correct region view`);
-    }
-
     if (!infiniteSpectrogramCanvas) {
         if (!isStudyMode()) {
             console.log(`⚠️ updateSpectrogramViewport: No infinite canvas! playbackRate=${playbackRate}`);
@@ -1676,9 +1655,12 @@ export function updateSpectrogramViewport(playbackRate) {
     
     // NOTE: Selection box now drawn on separate overlay canvas (spectrogram-renderer.js)
     // No need to draw it here - completely separate layer with no conflicts!
-    
+
     // NOTE: Feature box positions are updated AFTER zoom transitions complete
     // (in region-tracker.js zoom completion callbacks), not during animation loops
+
+    // Update last playback rate for next comparison
+    lastViewportPlaybackRate = playbackRate;
 }
 
 /**
