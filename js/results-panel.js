@@ -195,31 +195,64 @@ async function loadSession(session) {
             console.log(`✅ Set duration to: ${session.duration} hours`);
         }
 
-        // 5. Set highpass filter
+        // 4. Set highpass filter
         const highpassInput = document.getElementById('highpassFreq');
         if (highpassInput) {
             highpassInput.value = session.highpass_freq || '2';
             console.log(`✅ Set highpass to: ${session.highpass_freq} Hz`);
         }
 
-        // 6. Set normalize checkbox
+        // 5. Set normalize checkbox
         const normalizeCheckbox = document.getElementById('enableNormalize');
         if (normalizeCheckbox) {
             normalizeCheckbox.checked = session.enable_normalize;
             console.log(`✅ Set normalize to: ${session.enable_normalize}`);
         }
 
-        // 7. Store regions for loading after data fetch
-        window.pendingSessionRegions = session.regions;
-        console.log(`📦 Stored ${session.region_count} regions for loading after fetch`);
+        // 6. Clear any existing regions for this volcano to prevent stale data
+        const { getCurrentRegions } = await import('./region-tracker.js');
+        const currentRegions = getCurrentRegions();
+        const regionsCleared = currentRegions.length;
+        currentRegions.length = 0;
+        if (regionsCleared > 0) {
+            console.log(`🧹 Cleared ${regionsCleared} old regions for ${session.volcano}`);
+        }
 
-        // 8. Store fetch timestamp to override time calculation
+        // 7. Calculate expected data window for this session
+        const fetchTime = new Date(session.fetch_timestamp);
+        const fetchMinute = fetchTime.getUTCMinutes();
+        const fetchSecond = fetchTime.getUTCSeconds();
+        const periodStart = Math.floor(fetchMinute / 10) * 10;
+        const secondsSincePeriodStart = (fetchMinute - periodStart) * 60 + fetchSecond;
+
+        let expectedDataEnd;
+        if (secondsSincePeriodStart >= 135) {
+            expectedDataEnd = new Date(fetchTime.getTime());
+            expectedDataEnd.setUTCMinutes(periodStart, 0, 0);
+        } else {
+            expectedDataEnd = new Date(fetchTime.getTime());
+            expectedDataEnd.setUTCMinutes(periodStart - 10, 0, 0);
+        }
+        const expectedDataStart = new Date(expectedDataEnd.getTime() - session.duration * 3600 * 1000);
+
+        // 8. Store regions AND expected data window for loading after data fetch
+        window.pendingSessionRegions = session.regions;
+        window.pendingSessionDataStart = expectedDataStart.toISOString();
+        window.pendingSessionDataEnd = expectedDataEnd.toISOString();
+        console.log(`📦 Stored ${session.region_count} regions for loading after fetch`);
+        console.log(`⏰ Expected data window: ${expectedDataStart.toISOString()} to ${expectedDataEnd.toISOString()}`);
+
+        // 9. Store fetch timestamp to override time calculation
         window.sessionFetchTimestamp = session.fetch_timestamp;
         console.log(`📅 Using session fetch timestamp: ${session.fetch_timestamp}`);
 
-        // 9. Click the fetch button to load data (emulate normal fetch behavior)
+        // 9. Force enable and click fetch button (bypass volcano-data lock in study mode)
         const startBtn = document.getElementById('startBtn');
         if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.classList.remove('streaming');
+            startBtn.title = '';
+            console.log('🔓 Fetch button force-enabled for session load');
             console.log('🚀 Triggering data fetch...');
             startBtn.click();
         } else {
@@ -264,25 +297,51 @@ function hideSessionInfo() {
 function setupRegionInjectionListener() {
     // Poll for when data is loaded and we have pending regions to inject
     const checkInterval = setInterval(async () => {
-        // Check if we have pending regions and data is loaded
-        if (!window.pendingSessionRegions) return;
+        // Atomically grab and clear regions FIRST (race condition protection)
+        const regionsToInject = window.pendingSessionRegions;
+        const expectedDataStart = window.pendingSessionDataStart;
+        const expectedDataEnd = window.pendingSessionDataEnd;
+        if (!regionsToInject) return;
+
+        window.pendingSessionRegions = null;
+        window.pendingSessionDataStart = null;
+        window.pendingSessionDataEnd = null;
 
         // Import State to check data times
         const State = await import('./audio-state.js');
-        if (!State.dataStartTime || !State.dataEndTime) return;
+        if (!State.dataStartTime || !State.dataEndTime) {
+            // Restore regions if data not ready yet
+            window.pendingSessionRegions = regionsToInject;
+            window.pendingSessionDataStart = expectedDataStart;
+            window.pendingSessionDataEnd = expectedDataEnd;
+            return;
+        }
+
+        // Check if data window matches expected window for this session
+        const actualDataStart = State.dataStartTime.toISOString();
+        const actualDataEnd = State.dataEndTime.toISOString();
+        if (actualDataStart !== expectedDataStart || actualDataEnd !== expectedDataEnd) {
+            // Wrong data window - restore regions and wait for correct data
+            window.pendingSessionRegions = regionsToInject;
+            window.pendingSessionDataStart = expectedDataStart;
+            window.pendingSessionDataEnd = expectedDataEnd;
+            return;
+        }
 
         // Import zoomState to check if initialized
         const { zoomState } = await import('./zoom-state.js');
-        if (!zoomState.isInitialized()) return;
+        if (!zoomState.isInitialized()) {
+            // Restore regions if zoom not ready yet
+            window.pendingSessionRegions = regionsToInject;
+            window.pendingSessionDataStart = expectedDataStart;
+            window.pendingSessionDataEnd = expectedDataEnd;
+            return;
+        }
 
         // All conditions met - inject regions!
-        clearInterval(checkInterval);
-        console.log(`🎯 Injecting ${window.pendingSessionRegions.length} regions from session data`);
+        console.log(`🎯 Injecting ${regionsToInject.length} regions from session data`);
 
-        await injectSessionRegions(window.pendingSessionRegions);
-
-        // Clear pending regions
-        window.pendingSessionRegions = null;
+        await injectSessionRegions(regionsToInject);
     }, 100); // Check every 100ms
 }
 
@@ -316,9 +375,21 @@ async function injectSessionRegions(sessionRegions) {
         const regionStartMs = new Date(sessionRegion.regionStartTime).getTime();
         const regionEndMs = new Date(sessionRegion.regionEndTime).getTime();
 
+        // Skip regions completely outside data bounds
+        if (regionEndMs < dataStartMs || regionStartMs > dataEndMs) {
+            console.log(`⏭️ Skipping region ${sessionRegion.regionNumber} - outside data window`);
+            continue;
+        }
+
         // Clamp to data bounds
         const clampedStartMs = Math.max(regionStartMs, dataStartMs);
         const clampedEndMs = Math.min(regionEndMs, dataEndMs);
+
+        // Double-check clamped values are valid
+        if (clampedStartMs >= clampedEndMs) {
+            console.warn(`⚠️ Skipping region ${sessionRegion.regionNumber} - invalid after clamping`);
+            continue;
+        }
 
         // Calculate sample indices
         const regionStartSeconds = (clampedStartMs - dataStartMs) / 1000;
