@@ -229,7 +229,7 @@ function redrawCanvasBoxes() {
             const placedAnnotations = []; // Track placed annotations for collision detection
             for (const savedBox of completedSelectionBoxes) {
                 if (savedBox.notes) {
-                    drawAnnotation(spectrogramOverlayCtx, canvas, savedBox, placedAnnotations);
+                    drawAnnotation(spectrogramOverlayCtx, canvas, savedBox, placedAnnotations, completedSelectionBoxes);
                 }
             }
         }
@@ -1340,10 +1340,11 @@ function wrapText(ctx, text, maxWidth) {
  * Draw annotation text above a feature box with collision detection
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {HTMLCanvasElement} canvas - Canvas element
- * @param {Object} box - Feature box data
+ * @param {Object} box - Feature box data (the box we're annotating)
  * @param {Array} placedAnnotations - Array tracking already placed annotations for collision detection
+ * @param {Array} allBoxes - All feature boxes to check for collisions
  */
-function drawAnnotation(ctx, canvas, box, placedAnnotations) {
+function drawAnnotation(ctx, canvas, box, placedAnnotations, allBoxes) {
     // Only draw annotations if box has notes
     if (!box.notes || box.notes.trim() === '') {
         return;
@@ -1426,50 +1427,119 @@ function drawAnnotation(ctx, canvas, box, placedAnnotations) {
     const textWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
     const halfWidth = textWidth / 2;
 
-    // Center text above box (default)
-    let textX = boxX + (boxWidth / 2);
-    let textY = boxY - 20 - totalTextHeight;
-    let drawBelow = false;
-    let drawToSide = null; // 'left' or 'right' if drawing to the side
-
-    // Top guard - if annotation would go off the top, draw below instead
-    if (textY < 10) {
-        textY = boxY + boxHeight + 20;
-        drawBelow = true;
-    }
-
-    // Collision detection - draw to side if too close to another annotation
-    let finalTextX = textX;
-    let finalTextY = textY;
     const padding = 10;
     const sideOffset = 30;
 
-    // Check for collision with any placed annotation (single pass, no loop)
-    for (const placed of placedAnnotations) {
-        // Check X overlap (25% wider for breathing room)
-        const xOverlap = Math.abs(finalTextX - placed.x) <
-            ((halfWidth + placed.halfWidth) * 1.25 + padding);
+    // Helper function to check if text rect collides with anything
+    const checkCollision = (textCenterX, textCenterY) => {
+        const textLeft = textCenterX - halfWidth - padding;
+        const textRight = textCenterX + halfWidth + padding;
+        const textTop = textCenterY - totalTextHeight / 2 - padding;
+        const textBottom = textCenterY + totalTextHeight / 2 + padding;
 
-        // Check Y overlap
-        const yOverlap = Math.abs(finalTextY - placed.y) <
-            (totalTextHeight / 2 + placed.height / 2 + padding);
+        // Check collision with all feature boxes (except the one we're annotating)
+        for (const otherBox of allBoxes) {
+            if (otherBox === box) continue; // Skip the box we're annotating
 
-        if (xOverlap && yOverlap) {
-            // Collision detected! Draw to the side, away from the colliding annotation
+            // Calculate other box position (same logic as above)
+            const otherOriginalSampleRate = State.currentMetadata?.original_sample_rate || 100;
+            const otherOriginalNyquist = otherOriginalSampleRate / 2;
+            const otherPlaybackRate = State.currentPlaybackRate || 1.0;
+            const otherScaleTransition = getScaleTransitionState();
 
-            // Determine which side to move to based on relative position
-            if (finalTextX < placed.x) {
-                // Colliding annotation is to the right, so move left
-                drawToSide = 'left';
-                finalTextX = boxX - halfWidth - sideOffset;
-                finalTextY = boxY + (boxHeight / 2) - (totalTextHeight / 2);
+            let otherLowFreqY, otherHighFreqY;
+            if (otherScaleTransition.inProgress && otherScaleTransition.oldScaleType) {
+                const oldLowY = getYPositionForFrequencyScaled(otherBox.lowFreq, otherOriginalNyquist, canvas.height, otherScaleTransition.oldScaleType, otherPlaybackRate);
+                const newLowY = getYPositionForFrequencyScaled(otherBox.lowFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
+                const oldHighY = getYPositionForFrequencyScaled(otherBox.highFreq, otherOriginalNyquist, canvas.height, otherScaleTransition.oldScaleType, otherPlaybackRate);
+                const newHighY = getYPositionForFrequencyScaled(otherBox.highFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
+                otherLowFreqY = oldLowY + (newLowY - oldLowY) * otherScaleTransition.interpolationFactor;
+                otherHighFreqY = oldHighY + (newHighY - oldHighY) * otherScaleTransition.interpolationFactor;
             } else {
-                // Colliding annotation is to the left, so move right
-                drawToSide = 'right';
-                finalTextX = boxX + boxWidth + halfWidth + sideOffset;
-                finalTextY = boxY + (boxHeight / 2) - (totalTextHeight / 2);
+                otherLowFreqY = getYPositionForFrequencyScaled(otherBox.lowFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
+                otherHighFreqY = getYPositionForFrequencyScaled(otherBox.highFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
             }
-            break; // Only handle first collision
+
+            const otherStartTimestamp = new Date(otherBox.startTime);
+            const otherEndTimestamp = new Date(otherBox.endTime);
+            const otherInterpolatedRange = getInterpolatedTimeRange();
+            const otherDisplayStartMs = otherInterpolatedRange.startTime.getTime();
+            const otherDisplayEndMs = otherInterpolatedRange.endTime.getTime();
+            const otherDisplaySpanMs = otherDisplayEndMs - otherDisplayStartMs;
+            const otherStartMs = otherStartTimestamp.getTime();
+            const otherEndMs = otherEndTimestamp.getTime();
+            const otherStartProgress = (otherStartMs - otherDisplayStartMs) / otherDisplaySpanMs;
+            const otherEndProgress = (otherEndMs - otherDisplayStartMs) / otherDisplaySpanMs;
+            const otherStartX = otherStartProgress * canvas.width;
+            const otherEndX = otherEndProgress * canvas.width;
+
+            const otherBoxX = Math.min(otherStartX, otherEndX);
+            const otherBoxY = Math.min(otherHighFreqY, otherLowFreqY);
+            const otherBoxWidth = Math.abs(otherEndX - otherStartX);
+            const otherBoxHeight = Math.abs(otherLowFreqY - otherHighFreqY);
+
+            // Check rectangle overlap
+            if (!(textRight < otherBoxX || textLeft > otherBoxX + otherBoxWidth ||
+                  textBottom < otherBoxY || textTop > otherBoxY + otherBoxHeight)) {
+                return true; // Collision!
+            }
+        }
+
+        // Check collision with already placed annotations
+        for (const placed of placedAnnotations) {
+            const placedLeft = placed.x - placed.halfWidth - padding;
+            const placedRight = placed.x + placed.halfWidth + padding;
+            const placedTop = placed.y - placed.height / 2 - padding;
+            const placedBottom = placed.y + placed.height / 2 + padding;
+
+            if (!(textRight < placedLeft || textLeft > placedRight ||
+                  textBottom < placedTop || textTop > placedBottom)) {
+                return true; // Collision!
+            }
+        }
+
+        return false; // No collision
+    };
+
+    // Try positions in order: above → below → left → right
+    let finalTextX, finalTextY;
+    let drawToSide = null;
+
+    // Position 1: Above (default)
+    let aboveX = boxX + (boxWidth / 2);
+    let aboveY = boxY - 20 - totalTextHeight / 2;
+
+    if (aboveY - totalTextHeight / 2 >= 10 && !checkCollision(aboveX, aboveY)) {
+        // Above works!
+        finalTextX = aboveX;
+        finalTextY = aboveY;
+    } else {
+        // Position 2: Below
+        let belowX = boxX + (boxWidth / 2);
+        let belowY = boxY + boxHeight + 20 + totalTextHeight / 2;
+
+        if (belowY + totalTextHeight / 2 <= canvas.height - 10 && !checkCollision(belowX, belowY)) {
+            // Below works!
+            finalTextX = belowX;
+            finalTextY = belowY;
+        } else {
+            // Position 3: Left
+            let leftX = boxX - halfWidth - sideOffset;
+            let leftY = boxY + (boxHeight / 2);
+
+            if (leftX - halfWidth >= 10 && !checkCollision(leftX, leftY)) {
+                // Left works!
+                finalTextX = leftX;
+                finalTextY = leftY;
+                drawToSide = 'left';
+            } else {
+                // Position 4: Right (fallback)
+                let rightX = boxX + boxWidth + halfWidth + sideOffset;
+                let rightY = boxY + (boxHeight / 2);
+                finalTextX = rightX;
+                finalTextY = rightY;
+                drawToSide = 'right';
+            }
         }
     }
 
@@ -1513,14 +1583,18 @@ function drawAnnotation(ctx, canvas, box, placedAnnotations) {
         // Line from left side of text to right side of box
         ctx.moveTo(finalTextX - halfWidth, finalTextY + totalTextHeight / 2);
         ctx.lineTo(boxX + boxWidth, boxY + boxHeight / 2);
-    } else if (drawBelow) {
-        // Line from top of text to bottom of box
-        ctx.moveTo(finalTextX, finalTextY);
-        ctx.lineTo(boxX + boxWidth / 2, boxY + boxHeight);
     } else {
-        // Line from bottom of text to top of box
-        ctx.moveTo(finalTextX, finalTextY + totalTextHeight);
-        ctx.lineTo(boxX + boxWidth / 2, boxY);
+        // Determine if annotation is above or below the box
+        const annotationIsBelow = finalTextY > boxY + boxHeight;
+        if (annotationIsBelow) {
+            // Line from top of text to bottom of box
+            ctx.moveTo(finalTextX, finalTextY);
+            ctx.lineTo(boxX + boxWidth / 2, boxY + boxHeight);
+        } else {
+            // Line from bottom of text to top of box
+            ctx.moveTo(finalTextX, finalTextY + totalTextHeight);
+            ctx.lineTo(boxX + boxWidth / 2, boxY);
+        }
     }
     ctx.stroke();
 
