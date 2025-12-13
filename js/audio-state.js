@@ -34,6 +34,7 @@ export let audioContext = null;
 export let workletNode = null;
 export let analyserNode = null;
 export let gainNode = null;
+export let recordingDestination = null;  // MediaStreamAudioDestination for video recording
 
 // Playback state
 export let playbackState = PlaybackState.STOPPED;
@@ -149,6 +150,7 @@ export function setAudioContext(value) { audioContext = value; }
 export function setWorkletNode(value) { workletNode = value; }
 export function setAnalyserNode(value) { analyserNode = value; }
 export function setGainNode(value) { gainNode = value; }
+export function setRecordingDestination(value) { recordingDestination = value; }
 export function setPlaybackState(value) {
     // console.log(`🔧 setPlaybackState(${value}) - previous state: ${playbackState}`);
     playbackState = value;

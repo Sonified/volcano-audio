@@ -1050,6 +1050,16 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
                                 document.getElementById('downloadAudioBtn').style.background = '#4a7c2f';
                                 document.getElementById('downloadAudioBtn').style.color = '#f1f8f4';
                                 document.getElementById('downloadAudioBtn').style.borderColor = '#5a8c3f';
+
+                                // Enable Record Video button (if visible)
+                                const recordVideoBtn = document.getElementById('recordVideoBtn');
+                                if (recordVideoBtn && recordVideoBtn.style.display !== 'none') {
+                                    recordVideoBtn.disabled = false;
+                                    recordVideoBtn.style.cursor = 'pointer';
+                                    recordVideoBtn.style.background = '#2f5a7c';
+                                    recordVideoBtn.style.color = '#f1f6f8';
+                                    recordVideoBtn.style.borderColor = '#3f6a8c';
+                                }
                             } else {
                                 // Not all samples written yet - wait a bit and check again
                                 console.log(`⏳ ${logTime()} Waiting for more samples (${totalSamplesWritten}/${totalWorkletSamples})...`);
@@ -1706,6 +1716,16 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
     document.getElementById('downloadAudioBtn').style.background = '#4a7c2f';
     document.getElementById('downloadAudioBtn').style.color = '#f1f8f4';
     document.getElementById('downloadAudioBtn').style.borderColor = '#5a8c3f';
+
+    // Enable Record Video button (if visible)
+    const recordVideoBtn = document.getElementById('recordVideoBtn');
+    if (recordVideoBtn && recordVideoBtn.style.display !== 'none') {
+        recordVideoBtn.disabled = false;
+        recordVideoBtn.style.cursor = 'pointer';
+        recordVideoBtn.style.background = '#2f5a7c';
+        recordVideoBtn.style.color = '#f1f6f8';
+        recordVideoBtn.style.borderColor = '#3f6a8c';
+    }
 
     // Enable loop button if tutorial is skipped (Personal mode or Study mode after first session)
     import('./master-modes.js').then(({ shouldSkipTutorial, isStudyMode }) => {

@@ -263,7 +263,22 @@ export async function initAudioWorklet() {
     const volumeSlider = document.getElementById('volumeSlider');
     gain.gain.value = volumeSlider ? parseFloat(volumeSlider.value) / 100 : 1.0;
     State.setGainNode(gain);
-    
+
+    // Create audio destination for video recording (tap before volume)
+    // Only if the browser supports it (some contexts don't have this API)
+    if (typeof State.audioContext.createMediaStreamDestination === 'function') {
+        try {
+            const recordingDestination = State.audioContext.createMediaStreamDestination();
+            State.setRecordingDestination(recordingDestination);
+            worklet.connect(recordingDestination);  // Tap for recording
+            console.log('🎥 Video recording audio tap initialized');
+        } catch (e) {
+            console.warn('⚠️ Could not create recording destination:', e);
+        }
+    } else {
+        console.warn('⚠️ MediaStreamDestination not supported in this browser context');
+    }
+
     worklet.connect(gain);
     gain.connect(analyser);
     gain.connect(State.audioContext.destination);
@@ -2277,7 +2292,26 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('purgeCacheBtn').addEventListener('click', purgeCloudflareCache);
     document.getElementById('downloadBtn').addEventListener('click', downloadAudio);
     document.getElementById('downloadAudioBtn').addEventListener('click', downloadAudio);
-    
+
+    // Record Video (localhost only) - HIDDEN FOR NOW
+    const recordVideoBtn = document.getElementById('recordVideoBtn');
+    if (recordVideoBtn) {
+        // Keep hidden for now - uncomment to enable
+        // const isLocalhost = window.location.hostname === 'localhost' ||
+        //                    window.location.hostname === '127.0.0.1' ||
+        //                    window.location.hostname === '';
+
+        // if (isLocalhost) {
+        //     recordVideoBtn.style.display = 'inline-block';
+        //     recordVideoBtn.addEventListener('click', async () => {
+        //         const { toggleVideoRecording } = await import('./video-recorder.js');
+        //         toggleVideoRecording();
+        //     });
+        // } else {
+        //     recordVideoBtn.style.display = 'none';
+        // }
+    }
+
     // Station Selection
     document.getElementById('volcano').addEventListener('change', (e) => {
         loadStations();

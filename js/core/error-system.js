@@ -155,6 +155,15 @@ async function handleCriticalError(errorMessage, errorDetails) {
             downloadAudioBtn.style.borderColor = '#555';
         }
 
+        const recordVideoBtn = document.getElementById('recordVideoBtn');
+        if (recordVideoBtn) {
+            recordVideoBtn.disabled = true;
+            recordVideoBtn.style.cursor = 'not-allowed';
+            recordVideoBtn.style.background = 'rgba(60, 60, 60, 0.9)';
+            recordVideoBtn.style.color = '#bbb';
+            recordVideoBtn.style.borderColor = '#555';
+        }
+
         const completeBtn = document.getElementById('completeBtn');
         if (completeBtn) completeBtn.disabled = true;
     } catch (e) {
