@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Volcano Audification Study</title>
+    <title>Volcano Seismic Audification Portal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌋</text></svg>">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/fzstd@0.1.1/umd/index.min.js"></script>
@@ -22,6 +22,7 @@
             <div id="modeSelectorContainer" style="flex: 1; display: flex; align-items: center; gap: 8px; visibility: hidden; opacity: 0; transition: opacity 0.3s;">
                 <label for="modeSelector" style="font-size: 13px; font-weight: 600; color: #aaa; white-space: nowrap; user-select: none;">Mode:</label>
                 <select id="modeSelector" style="padding: 4px 8px; font-size: 13px; font-weight: 600; border-radius: 4px; border: 1px solid #555; background: rgba(60, 60, 60, 0.9); color: #ddd; cursor: pointer; min-width: 120px;">
+                    <option value="showcase">✨ Showcase</option>
                     <option value="production">🎓 Production</option>
                     <option value="personal">👤 Personal</option>
                     <option value="dev" selected>🔧 Dev</option>
@@ -32,7 +33,7 @@
                     <option value="tutorial_end">🎬 Tutorial End</option>
                 </select>
             </div>
-            <h1 id="pageTitle" style="margin: 0 0 0 0; flex: 0 0 auto; font-size: 1.5em; opacity: 0.88; color: #fff;">Volcano Audification Study</h1>
+            <h1 id="pageTitle" style="margin: 0 0 0 0; flex: 0 0 auto; font-size: 1.5em; opacity: 0.88; color: #fff;">Volcano Seismic Audification Portal</h1>
             <div style="flex: 1; display: flex; justify-content: flex-end; align-items: flex-end; gap: 8px;">
                 <div id="participantIdDisplay" style="display: none; margin-bottom: 0;">
                     <span id="participantIdText" style="font-size: 13px; color: #aaa; cursor: pointer; user-select: none; white-space: nowrap; padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(100, 100, 100, 0.6); background: rgba(40, 40, 40, 0.4); transition: background-color 0.2s; display: inline-block;" title="Click to open Participant Setup">
@@ -57,7 +58,7 @@
         </div>
 
         <!-- Results Panel (shown only for "results" user in study mode) -->
-        <div class="panel panel-results" id="resultsPanel" style="padding: 15px 20px; display: none;">
+        <div class="panel panel-results" id="resultsPanel" style="padding: 10px 20px; display: none;">
             <div style="display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;">
                 <!-- Title -->
                 <div style="display: flex; flex-direction: column; justify-content: flex-end; margin-right: 8px;">
@@ -87,7 +88,7 @@
                 <div style="flex: 1;"></div>
 
                 <!-- View Outcomes Button -->
-                <button type="button" id="viewResultsBtn" style="padding: 8px 20px; font-size: 14px; font-weight: 600; background: #28a745; border-color: #28a745; color: white; border-radius: 4px; white-space: nowrap;">View Outcomes</button>
+                <button type="button" id="viewResultsBtn" style="padding: 8px 20px; font-size: 14px; font-weight: 600; background: linear-gradient(135deg, #1a1a4d 0%, #8b008b 100%); border-color: #2a2a5d; color: white; border-radius: 4px; white-space: nowrap;">View Outcomes</button>
             </div>
 
             <!-- Session Info Display -->
@@ -122,9 +123,8 @@
                         <option value="infrasound">Infrasound</option>
                     </select>
                 </div>
-                
-                <div class="control-group" id="stationControlGroup" style="display: none;">
-                    <label for="station">Station (by distance):</label>
+
+                <div class="control-group" id="stationControlGroup">
                     <select id="station" style="min-width: 300px;">
                         <option value="">Loading stations...</option>
                     </select>
@@ -209,6 +209,12 @@
                     <input type="range" id="volumeSlider" min="0" max="200" step="1" value="100" style="flex: 1; min-width: 0;">
                 </div>
                 <button type="button" id="completeBtn" disabled class="begin-analysis-btn" style="margin-left: auto; padding: 10px 16px; font-size: 16px; font-weight: 700; background: #007bff; border: 2px solid #007bff; color: white; border-radius: 6px; cursor: not-allowed; white-space: nowrap; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); opacity: 0.5; display: flex; align-items: center; justify-content: center; vertical-align: middle;" onmouseover="if(!this.disabled) { this.style.background='#0056b3'; this.style.boxShadow='0 3px 6px rgba(0,0,0,0.3)'; }" onmouseout="if(!this.disabled) { this.style.background='#007bff'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.2)'; }">Begin Analysis</button>
+
+                <!-- Spacer to push Download Audio to the right -->
+                <div style="flex: 1;"></div>
+
+                <!-- Download Audio Button -->
+                <button type="button" id="downloadAudioBtn" disabled style="padding: 10px 16px; font-size: 14px; font-weight: 600; border-radius: 4px; border: 1px solid #555; background: rgba(60, 60, 60, 0.9); color: #bbb; cursor: not-allowed; white-space: nowrap; transition: all 0.2s;">💾 Download Audio</button>
                 <div style="display: none; align-items: center; flex: 1 1 auto; min-width: 200px; max-width: min(500px, 100%); gap: 10px; padding: 0 20px; box-sizing: border-box;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
                         <input type="checkbox" id="removeDCOffset" checked style="width: 20px; height: 20px; cursor: pointer;">
@@ -250,6 +256,10 @@
                     <div style="display: none;">
                         <input type="checkbox" id="playOnClick" checked style="width: 20px; height: 20px; cursor: pointer;">
                         <label for="playOnClick" style="margin-bottom: 0; cursor: pointer; font-weight: 700; font-size: 14px; color: #ffe8e8; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); white-space: nowrap;">Play on Click</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="minFrequencyInput" style="font-size: 14px; font-weight: 700; white-space: nowrap; user-select: none; color: #ffe8e8; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);">Min Freq (Hz):</label>
+                        <input type="number" id="minFrequencyInput" value="0.01" step="0.001" min="0.001" max="10" style="width: 80px; padding: 4px 8px; font-size: 14px; font-weight: 600; border-radius: 4px; border: 1px solid #ccc; background: rgba(255, 255, 255, 0.95);">
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                     <label for="frequencyScale" style="font-size: 14px; font-weight: 700; white-space: nowrap; user-select: none; color: #ffe8e8; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);">Frequency Scale:</label>
@@ -316,7 +326,7 @@
     
     <!-- Permanent Modal Overlay Background -->
     <!-- Starts hidden - modal system controls when it shows (based on flags and workflow logic) -->
-    <div id="permanentOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.2); z-index: 1000; align-items: center; justify-content: center; opacity: 0;">
+    <div id="permanentOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; opacity: 0;">
         <!-- Modals injected dynamically by js/modal-templates.js will appear here -->
     </div>
     

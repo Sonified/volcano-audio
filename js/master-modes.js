@@ -10,6 +10,7 @@
  * ⚠️ TEST MODE PHILOSOPHY: Test modes ONLY set flags. All behavior comes from REAL LOGIC
  *    that checks those flags. Never add special cases for test modes - fix the logic instead.
  *
+ * SHOWCASE: Like PERSONAL but prompts for participant ID - for demos/presentations
  * PERSONAL: Skip tutorial, direct access to app
  * DEV: Current development environment with tutorial
  * PRODUCTION: Volcano Audio Study Live Interface - What users get when they show up
@@ -20,6 +21,7 @@
  * TUTORIAL_END: Test mode - jump to last 2 messages of tutorial (tests tutorial completion flow)
  */
 export const AppMode = {
+    SHOWCASE: 'showcase',
     PERSONAL: 'personal',
     DEV: 'dev',
     PRODUCTION: 'production',
@@ -35,7 +37,7 @@ export const AppMode = {
  * 🎯 MODE SELECTION - Can be changed via UI dropdown or here
  * ═══════════════════════════════════════════════════════════
  */
-export const DEFAULT_MODE = AppMode.DEV; // Default if no localStorage selection
+export const DEFAULT_MODE = AppMode.SHOWCASE; // Default if no localStorage selection
 
 /**
  * Detect if running locally vs production
@@ -66,19 +68,33 @@ if (storedMode === 'study') {
     }
 }
 
-// Production: Always force PRODUCTION mode (ignore localStorage)
+// Production: Always force SHOWCASE mode (ignore localStorage)
 // Local: Allow mode switching via localStorage or DEFAULT_MODE
 export const CURRENT_MODE = isLocalEnvironment()
-    ? (storedMode && Object.values(AppMode).includes(storedMode) 
-        ? storedMode 
+    ? (storedMode && Object.values(AppMode).includes(storedMode)
+        ? storedMode
         : DEFAULT_MODE)
-    : AppMode.PRODUCTION; // Force PRODUCTION mode for production
+    : AppMode.SHOWCASE; // Force SHOWCASE mode for production
 
 /**
  * Mode Configuration
  * Each mode defines what features and flows are enabled
  */
 const MODE_CONFIG = {
+    [AppMode.SHOWCASE]: {
+        name: 'Showcase Mode',
+        description: 'Demo mode with participant ID prompt, no surveys or timeouts',
+        skipTutorial: true,
+        showPreSurveys: false,
+        showPostSurveys: false,
+        requireQualtricsSubmission: false,
+        enableAdminFeatures: false,
+        showSubmitButton: true,
+        autoStartPlayback: false,
+        promptForParticipantId: true,  // Show participant modal on startup
+        disableSessionTimeout: true    // No timeout in showcase mode
+    },
+
     [AppMode.PERSONAL]: {
         name: 'Personal Mode',
         description: 'Direct app access without tutorial or surveys',
@@ -249,6 +265,10 @@ export function getCurrentModeConfig() {
 /**
  * Mode Check Helpers
  */
+export function isShowcaseMode() {
+    return CURRENT_MODE === AppMode.SHOWCASE;
+}
+
 export function isPersonalMode() {
     return CURRENT_MODE === AppMode.PERSONAL;
 }

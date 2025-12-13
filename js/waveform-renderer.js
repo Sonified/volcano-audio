@@ -1206,26 +1206,42 @@ export function setupWaveformInteraction() {
                             }
                             
                             // Regular non-tutorial flow
-                            // Check if Begin Analysis has been clicked
-                                import('./study-workflow.js').then(({ hasBegunAnalysisThisSession }) => {
-                                    const hasBegunAnalysis = hasBegunAnalysisThisSession();
-                                    const newMessage = hasBegunAnalysis 
-                                        ? 'Type (R) or click Add Region to create a new region.'
-                                        : 'Explore mode: select a volcano and click Begin Analysis when ready.';
-                                    
-                                    // Only update if message has changed (check beginning of text)
+                            // Check if in SHOWCASE mode (no Begin Analysis button)
+                            import('./master-modes.js').then(({ isShowcaseMode }) => {
+                                if (isShowcaseMode()) {
+                                    // SHOWCASE mode: no Begin Analysis button, go straight to region creation
+                                    const newMessage = 'Press the (R) key to create a new region or press the button.';
                                     if (!statusEl.textContent.startsWith(newMessage.substring(0, 20))) {
                                         statusEl.className = 'status info';
                                         statusEl.textContent = newMessage;
                                     }
-                                }).catch(() => {
-                                    // Fallback if import fails - assume no session started
-                                    const newMessage = 'Explore mode: select a volcano and click Begin Analysis when ready.';
-                                    if (!statusEl.textContent.startsWith(newMessage.substring(0, 20))) {
-                                        statusEl.className = 'status info';
-                                        statusEl.textContent = newMessage;
-                                    }
-                                });
+                                } else {
+                                    // Study/other modes: Check if Begin Analysis has been clicked
+                                    import('./study-workflow.js').then(({ hasBegunAnalysisThisSession }) => {
+                                        const hasBegunAnalysis = hasBegunAnalysisThisSession();
+                                        const newMessage = hasBegunAnalysis
+                                            ? 'Type (R) or click Add Region to create a new region.'
+                                            : 'Explore mode: select a volcano and click Begin Analysis when ready.';
+
+                                        // Only update if message has changed (check beginning of text)
+                                        if (!statusEl.textContent.startsWith(newMessage.substring(0, 20))) {
+                                            statusEl.className = 'status info';
+                                            statusEl.textContent = newMessage;
+                                        }
+                                    }).catch(() => {
+                                        // Fallback if import fails - assume no session started
+                                        const newMessage = 'Explore mode: select a volcano and click Begin Analysis when ready.';
+                                        if (!statusEl.textContent.startsWith(newMessage.substring(0, 20))) {
+                                            statusEl.className = 'status info';
+                                            statusEl.textContent = newMessage;
+                                        }
+                                    });
+                                }
+                            }).catch(() => {
+                                // Fallback if import fails
+                                statusEl.className = 'status info';
+                                statusEl.textContent = 'Press the (R) key to create a new region or press the button.';
+                            });
                         }).catch(() => {
                             // Fallback if import fails
                             statusEl.className = 'status info';

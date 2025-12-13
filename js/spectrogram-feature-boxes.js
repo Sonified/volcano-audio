@@ -13,9 +13,6 @@ import { getInterpolatedTimeRange } from './waveform-x-axis-renderer.js';
 // Track all feature boxes: Map<"regionIndex-featureIndex", HTMLElement>
 const featureBoxes = new Map();
 
-// Constants
-const MAX_FREQUENCY = 50; // Hz - Nyquist frequency for 100 Hz sample rate
-
 /**
  * Add a feature box (called when selection completes)
  */

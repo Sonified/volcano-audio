@@ -13,42 +13,123 @@
  */
 
 import * as State from './audio-state.js';
+import { isTouchDevice, isMobileScreen } from './audio-state.js';
 import { drawWaveformWithSelection, updatePlaybackIndicator, drawWaveform } from './waveform-renderer.js';
 import { togglePlayPause, seekToPosition, updateWorkletSelection } from './audio-player.js';
 import { zoomState } from './zoom-state.js';
 import { getCurrentPlaybackBoundaries } from './playback-boundaries.js';
 import { renderCompleteSpectrogramForRegion, renderCompleteSpectrogram, resetSpectrogramState, cacheFullSpectrogram, clearCachedFullSpectrogram, cacheZoomedSpectrogram, clearCachedZoomedSpectrogram, updateSpectrogramViewport, restoreInfiniteCanvasFromCache, cancelActiveRender, shouldCancelActiveRender, clearSmartRenderBounds, getInfiniteCanvasStatus, getCachedFullStatus } from './spectrogram-complete-renderer.js';
-import { animateZoomTransition, getInterpolatedTimeRange, getRegionOpacityProgress, isZoomTransitionInProgress, getZoomTransitionProgress, getOldTimeRange } from './waveform-x-axis-renderer.js';
+import { animateZoomTransition, getInterpolatedTimeRange, getRegionOpacityProgress, isZoomTransitionInProgress, getZoomTransitionProgress, getOldTimeRange, drawWaveformXAxis } from './waveform-x-axis-renderer.js';
 import { initButtonsRenderer } from './waveform-buttons-renderer.js';
 import { addFeatureBox, removeFeatureBox, updateAllFeatureBoxPositions, renumberFeatureBoxes } from './spectrogram-feature-boxes.js';
-import { cancelSpectrogramSelection, redrawAllCanvasFeatureBoxes, removeCanvasFeatureBox } from './spectrogram-renderer.js';
+import { cancelSpectrogramSelection, redrawAllCanvasFeatureBoxes, removeCanvasFeatureBox, changeColormap, changeFftSize, changeFrequencyScale } from './spectrogram-renderer.js';
+import { getLogScaleMinFreq } from './spectrogram-axis-renderer.js';
 import { isTutorialActive, getTutorialPhase } from './tutorial-state.js';
-import { isStudyMode, isTutorialEndMode, isDevMode, isShowcaseMode } from './master-modes.js';
+import { isStudyMode, isTutorialEndMode } from './master-modes.js';
 import { hasSeenTutorial } from './study-workflow.js';
+import { log, logGroup, logGroupEnd } from './logger.js';
 
-// Region data structure - stored per volcano
-// Map<volcanoName, regions[]>
-let regionsByVolcano = new Map();
-let currentVolcano = null;
+// Region data structure - stored per spacecraft
+// Map<spacecraftName, regions[]>
+let regionsBySpacecraft = new Map();
+let currentSpacecraft = null;
 let activeRegionIndex = null;
 let activePlayingRegionIndex = null; // Track which region is currently playing (if any)
 let regionsDelayedForCrossfade = false; // Flag to track if regions are waiting for crossfade to complete
+
+/**
+ * Update spectrogram touch-action for mobile devices
+ * When zoomed into a region, allow drawing (touch-action: none)
+ * When zoomed out, allow scrolling (touch-action: pan-y via CSS default)
+ */
+function updateSpectrogramTouchMode(isZoomedIn) {
+    if (!isTouchDevice) return; // Only needed for touch devices
+
+    const spectrogram = document.getElementById('spectrogram');
+    if (!spectrogram) return;
+
+    if (isZoomedIn) {
+        spectrogram.classList.add('touch-draw');
+    } else {
+        spectrogram.classList.remove('touch-draw');
+    }
+}
 
 // 🎨 ANIMATION TOGGLE: Set to true for smooth slide animation, false for instant reordering
 const ANIMATE_REGION_REORDER = true; // Change to true to enable smooth slide animation
 
 // localStorage key prefix for feature persistence
-const STORAGE_KEY_PREFIX = 'volcano_audio_regions_';
+const STORAGE_KEY_PREFIX = 'solar_audio_regions_';
+
+/**
+ * Generate a unique storage key hash for a specific data fetch
+ * Combines username, spacecraft, data type, start time, and end time
+ * This ensures features are associated with the exact data AND user they were created by
+ */
+function generateStorageKey(spacecraft, dataType, startTime, endTime) {
+    // Get the current username
+    const username = localStorage.getItem('participantId') || 'anonymous';
+
+    if (!spacecraft || !dataType || !startTime || !endTime) {
+        // Fallback to old format if any component is missing
+        return spacecraft ? `${STORAGE_KEY_PREFIX}${username}_${spacecraft}` : null;
+    }
+
+    // Format times as ISO strings for consistent hashing
+    const startISO = startTime instanceof Date ? startTime.toISOString() : startTime;
+    const endISO = endTime instanceof Date ? endTime.toISOString() : endTime;
+
+    // Create a deterministic key from all components including username
+    // Format: solar_audio_regions_username_spacecraft_dataset_startTime_endTime
+    return `${STORAGE_KEY_PREFIX}${username}_${spacecraft}_${dataType}_${startISO}_${endISO}`;
+}
+
+/**
+ * Get current data type/dataset from metadata (not UI)
+ * Uses the actual dataset that was fetched, not what's shown in the dropdown
+ */
+function getCurrentDataType() {
+    // Use the actual dataset from metadata - this is set during data fetch
+    // and reflects the real data being viewed, not just UI state
+    if (State.currentMetadata && State.currentMetadata.dataset) {
+        return State.currentMetadata.dataset;
+    }
+    // Fallback to UI if metadata not available (shouldn't happen after data fetch)
+    const dataTypeSelect = document.getElementById('dataType');
+    return dataTypeSelect ? dataTypeSelect.value : null;
+}
+
+/**
+ * Get the current storage key based on spacecraft, data type, and time range
+ * Always uses metadata values (not cached currentSpacecraft) for accuracy
+ */
+function getCurrentStorageKey() {
+    // Always use getCurrentSpacecraft() which reads from metadata
+    // Don't use the cached currentSpacecraft variable - it may be stale
+    const spacecraft = getCurrentSpacecraft();
+    const dataType = getCurrentDataType();
+    const startTime = State.dataStartTime;
+    const endTime = State.dataEndTime;
+
+    return generateStorageKey(spacecraft, dataType, startTime, endTime);
+}
 
 // Button positions are recalculated on every click - no caching needed
 // This ensures positions are always fresh and immune to resize timing, DPR changes, etc.
 
 /**
- * Get the current volcano from the UI
+ * Get the current spacecraft from metadata (not UI)
+ * Uses the actual spacecraft that was fetched, not what's shown in the dropdown
  */
-export function getCurrentVolcano() {
-    const volcanoSelect = document.getElementById('volcano');
-    return volcanoSelect ? volcanoSelect.value : null;
+function getCurrentSpacecraft() {
+    // Use the actual spacecraft from metadata - this is set during data fetch
+    // and reflects the real data being viewed, not just UI state
+    if (State.currentMetadata && State.currentMetadata.spacecraft) {
+        return State.currentMetadata.spacecraft;
+    }
+    // Fallback to UI if metadata not available
+    const spacecraftSelect = document.getElementById('spacecraft');
+    return spacecraftSelect ? spacecraftSelect.value : null;
 }
 
 /**
@@ -78,229 +159,152 @@ function getCurrentSpeedFactor() {
 }
 
 /**
- * Get regions for the current volcano
- * Uses currentVolcano if set, otherwise reads from UI
+ * Get regions for the current spacecraft
+ * Uses metadata (actual loaded data) as source of truth
  */
 export function getCurrentRegions() {
-    // Use currentVolcano if available (more reliable during volcano switches)
-    // Otherwise fall back to reading from UI
-    const volcano = currentVolcano || getCurrentVolcano();
-    if (!volcano) {
+    // Always use getCurrentSpacecraft() which reads from metadata
+    // Don't use the cached currentSpacecraft variable - it may be stale
+    const spacecraft = getCurrentSpacecraft();
+    if (!spacecraft) {
         return [];
     }
-    if (!regionsByVolcano.has(volcano)) {
-        regionsByVolcano.set(volcano, []);
+    if (!regionsBySpacecraft.has(spacecraft)) {
+        regionsBySpacecraft.set(spacecraft, []);
     }
-    return regionsByVolcano.get(volcano);
+    return regionsBySpacecraft.get(spacecraft);
 }
 
 /**
  * Save regions to localStorage (persists across page reloads)
- * Merges new regions with existing ones to preserve regions from different time ranges
+ * Uses hash-based key: spacecraft + dataType + startTime + endTime
+ * This ensures features are associated with the exact data they were created on
  */
-function saveRegionsToStorage(volcano, regions) {
-    if (!volcano) return;
+function saveRegionsToStorage(spacecraft, regions) {
+    if (!spacecraft) return;
 
     try {
-        const storageKey = STORAGE_KEY_PREFIX + volcano;
-
-        // Load existing regions from localStorage
-        let existingRegions = [];
-        try {
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                const data = JSON.parse(stored);
-                if (data && data.regions && Array.isArray(data.regions)) {
-                    existingRegions = data.regions;
-                }
-            }
-        } catch (e) {
-            existingRegions = [];
+        // Use hash-based storage key for precise data association
+        const storageKey = getCurrentStorageKey();
+        if (!storageKey) {
+            console.warn('⚠️ Cannot save regions - storage key not available (missing data type or time range)');
+            return;
         }
 
-        // Start with regions that are OUTSIDE the current data time range (preserve them)
-        const mergedRegions = [];
-
-        if (State.dataStartTime && State.dataEndTime) {
-            const dataStartMs = State.dataStartTime.getTime();
-            const dataEndMs = State.dataEndTime.getTime();
-
-            existingRegions.forEach(region => {
-                if (region.startTime && region.stopTime) {
-                    const regionStartMs = new Date(region.startTime).getTime();
-                    const regionEndMs = new Date(region.stopTime).getTime();
-
-                    // If region is completely outside current data range, preserve it
-                    if (regionEndMs < dataStartMs || regionStartMs > dataEndMs) {
-                        mergedRegions.push(region);
-                    }
-                    // If region overlaps with current range, it's controlled by in-memory array
-                    // (if deleted from memory, it stays deleted)
-                }
-            });
-        }
-
-        // Add all current in-memory regions (these are the source of truth for current time range)
-        regions.forEach(region => {
-            mergedRegions.push(region);
-        });
-
+        // For hash-based keys, we don't merge - each data fetch has its own storage
+        // Simply save the current regions for this specific data fetch
         const dataToSave = {
-            volcano: volcano,
-            regions: mergedRegions,
+            spacecraft: spacecraft,
+            dataType: getCurrentDataType(),
+            startTime: State.dataStartTime?.toISOString(),
+            endTime: State.dataEndTime?.toISOString(),
+            regions: regions,
             savedAt: new Date().toISOString()
         };
         localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-        console.log(`💾 Saved ${regions.length} region(s) for ${volcano} to localStorage (${mergedRegions.length} total preserved)`);
+
+        console.log(`💾 Saved ${regions.length} region(s) to localStorage with key: ${storageKey}`);
     } catch (error) {
         console.error('❌ Failed to save regions to localStorage:', error);
+        // localStorage might be full or disabled - continue without persistence
     }
 }
 
 /**
  * Load regions from localStorage (restores after page reload)
- * Filters out regions that fall outside the current time range
+ * Uses hash-based key: spacecraft + dataType + startTime + endTime
+ * Since the key is unique per data fetch, no filtering is needed
  */
-function loadRegionsFromStorage(volcano) {
-    if (!volcano) return null;
-    
+function loadRegionsFromStorage(spacecraft) {
+    if (!spacecraft) return null;
+
     try {
-        const storageKey = STORAGE_KEY_PREFIX + volcano;
-        const stored = localStorage.getItem(storageKey);
-        
-        if (!stored) {
+        // Use hash-based storage key for precise data association
+        const storageKey = getCurrentStorageKey();
+        if (!storageKey) {
+            console.log(`📂 Skipping region load for ${spacecraft} - storage key not available yet`);
             return null;
         }
-        
+
+        const stored = localStorage.getItem(storageKey);
+
+        if (!stored) {
+            console.log(`📂 No saved regions found for key: ${storageKey}`);
+            return null;
+        }
+
         const data = JSON.parse(stored);
         if (data && data.regions && Array.isArray(data.regions)) {
-            // Filter regions by time range if data time range is available
-            let filteredRegions = data.regions;
-            
-            if (State.dataStartTime && State.dataEndTime) {
-                const dataStartMs = State.dataStartTime.getTime();
-                const dataEndMs = State.dataEndTime.getTime();
-                
-                filteredRegions = data.regions.filter(region => {
-                    // Check if region falls within the current time range
-                    let regionStartMs, regionEndMs;
-
-                    // 🔥 FIX: Always use saved timestamps for filtering if available
-                    // Sample indices are relative to data start and change between fetches!
-                    if (region.startTime && region.stopTime) {
-                        // Use absolute timestamps - these don't change between data fetches
-                        regionStartMs = new Date(region.startTime).getTime();
-                        regionEndMs = new Date(region.stopTime).getTime();
-                    } else if (region.startSample !== undefined && region.endSample !== undefined) {
-                        // Fallback: convert from sample indices (old regions without timestamps)
-                        // ⚠️ WARNING: This will be WRONG if data fetch time range has changed!
-                        if (!zoomState.isInitialized()) {
-                            return false; // Don't load if we can't determine time range
-                        }
-                        const regionStartSeconds = zoomState.sampleToTime(region.startSample);
-                        const regionEndSeconds = zoomState.sampleToTime(region.endSample);
-                        regionStartMs = dataStartMs + (regionStartSeconds * 1000);
-                        regionEndMs = dataStartMs + (regionEndSeconds * 1000);
-                    } else {
-                        // Can't determine region time - exclude it
-                        return false;
-                    }
-
-                    // 🔥 STRICT BOUNDS CHECK: Region must be COMPLETELY within data bounds
-                    // Region cannot start before dataStartMs or end after dataEndMs
-                    if (regionStartMs < dataStartMs) {
-                        console.warn(`⚠️ Filtering out region ${region.id}: starts before data (${new Date(regionStartMs).toISOString()} < ${new Date(dataStartMs).toISOString()})`);
-                        return false; // Region starts before data begins
-                    }
-                    
-                    if (regionEndMs > dataEndMs) {
-                        console.warn(`⚠️ Filtering out region ${region.id}: ends after data (${new Date(regionEndMs).toISOString()} > ${new Date(dataEndMs).toISOString()})`);
-                        return false; // Region ends after data ends
-                    }
-                    
-                    // Also check if region is valid (start < end)
+            // With hash-based keys, regions are already specific to this exact data fetch
+            // No filtering needed - just validate that regions have valid time ranges
+            const validRegions = data.regions.filter(region => {
+                // Check if region is valid (start < end)
+                if (region.startTime && region.stopTime) {
+                    const regionStartMs = new Date(region.startTime).getTime();
+                    const regionEndMs = new Date(region.stopTime).getTime();
                     if (regionStartMs >= regionEndMs) {
                         console.warn(`⚠️ Filtering out region ${region.id}: invalid time range (start >= end)`);
-                        return false; // Invalid region
+                        return false;
                     }
-
-                    // Simple rule: filter out regions older than 24 hours from NOW
-                    const nowMs = Date.now();
-                    const twentyFourHoursAgo = nowMs - (24 * 60 * 60 * 1000);
-
-                    if (regionEndMs < twentyFourHoursAgo) {
-                        return false; // Too old, don't load it
-                    }
-
-                    // Region is valid and within bounds
-                    return true;
-                });
-                
-                if (filteredRegions.length !== data.regions.length) {
-                    console.log(`📂 Loaded ${data.regions.length} regions for ${volcano} from localStorage, filtered to ${filteredRegions.length} within time range`);
-                } else {
-                    console.log(`📂 Loaded ${data.regions.length} regions for ${volcano} from localStorage`);
                 }
-            } else {
-                // No time range available yet - don't load regions
-                console.log(`📂 Skipping region load for ${volcano} - time range not available yet`);
-                return null;
-            }
-            
-            return filteredRegions;
+                return true;
+            });
+
+            console.log(`📂 Loaded ${validRegions.length} region(s) from localStorage with key: ${storageKey}`);
+            return validRegions;
         }
     } catch (error) {
         console.error('❌ Failed to load regions from localStorage:', error);
     }
-    
+
     return null;
 }
 
 /**
- * Set regions for the current volcano
- * Uses currentVolcano if set, otherwise reads from UI
+ * Set regions for the current spacecraft
+ * Uses currentSpacecraft if set, otherwise reads from UI
  * Also saves to localStorage for persistence
  */
 function setCurrentRegions(newRegions) {
-    // Use currentVolcano if available (more reliable during volcano switches)
+    // Use currentSpacecraft if available (more reliable during spacecraft switches)
     // Otherwise fall back to reading from UI
-    const volcano = currentVolcano || getCurrentVolcano();
-    if (!volcano) {
+    const spacecraft = currentSpacecraft || getCurrentSpacecraft();
+    if (!spacecraft) {
         return;
     }
-    regionsByVolcano.set(volcano, newRegions);
+    regionsBySpacecraft.set(spacecraft, newRegions);
     
     // ✅ Save to localStorage for persistence (includes notes!)
-    saveRegionsToStorage(volcano, newRegions);
+    saveRegionsToStorage(spacecraft, newRegions);
 }
 
 /**
- * Switch to a different volcano's regions
- * Called when volcano selection changes
- * Note: This is called AFTER the UI select has already changed to the new volcano
- * @param {string} newVolcano - The volcano to switch to
+ * Switch to a different spacecraft's regions
+ * Called when spacecraft selection changes
+ * Note: This is called AFTER the UI select has already changed to the new spacecraft
+ * @param {string} newSpacecraft - The spacecraft to switch to
  * @param {boolean} delayRender - If true, don't render regions immediately (wait for crossfade)
  */
-export function switchVolcanoRegions(newVolcano, delayRender = false) {
-    if (!newVolcano) {
-        console.warn('⚠️ Cannot switch: no volcano specified');
+export function switchSpacecraftRegions(newSpacecraft, delayRender = false) {
+    if (!newSpacecraft) {
+        console.warn('⚠️ Cannot switch: no spacecraft specified');
         return;
     }
     
-    // Save current regions before switching (if we have a current volcano and it's different)
-    // Since getCurrentRegions() now uses currentVolcano when available, we can safely get the old volcano's regions
-    if (currentVolcano && currentVolcano !== newVolcano) {
-        // Get the current regions (for the old volcano) and save them
+    // Save current regions before switching (if we have a current spacecraft and it's different)
+    // Since getCurrentRegions() now uses currentSpacecraft when available, we can safely get the old spacecraft's regions
+    if (currentSpacecraft && currentSpacecraft !== newSpacecraft) {
+        // Get the current regions (for the old spacecraft) and save them
         const oldRegions = getCurrentRegions();
-        regionsByVolcano.set(currentVolcano, oldRegions);
+        regionsBySpacecraft.set(currentSpacecraft, oldRegions);
     }
     
-    // Clear active region indices when switching volcanoes
+    // Clear active region indices when switching spacecraft
     activeRegionIndex = null;
     activePlayingRegionIndex = null;
     
-    // Clear selection state when switching volcanoes (selections should NOT persist)
-    // Only regions are saved per volcano, not selections
+    // Clear selection state when switching spacecraft (selections should NOT persist)
+    // Only regions are saved per spacecraft, not selections
     State.setSelectionStart(null);
     State.setSelectionEnd(null);
     State.setSelectionStartX(null);
@@ -308,14 +312,14 @@ export function switchVolcanoRegions(newVolcano, delayRender = false) {
     hideAddRegionButton();
     updateWorkletSelection(); // Clear selection in worklet
     
-    // Update current volcano
-    currentVolcano = newVolcano;
+    // Update current spacecraft
+    currentSpacecraft = newSpacecraft;
     
-    // Initialize empty array for new volcano (regions will be loaded AFTER Fetch Data is clicked)
+    // Initialize empty array for new spacecraft (regions will be loaded AFTER Fetch Data is clicked)
     // Don't load regions here - they should only load after data fetch completes
-    if (!regionsByVolcano.has(newVolcano)) {
-        regionsByVolcano.set(newVolcano, []);
-        console.log(`📂 Initialized empty region array for ${newVolcano} (will load after Fetch Data)`);
+    if (!regionsBySpacecraft.has(newSpacecraft)) {
+        regionsBySpacecraft.set(newSpacecraft, []);
+        console.log(`📂 Initialized empty region array for ${newSpacecraft} (will load after Fetch Data)`);
     }
     
     // 🔧 FIX: Delay region rendering until waveform crossfade completes
@@ -325,7 +329,7 @@ export function switchVolcanoRegions(newVolcano, delayRender = false) {
         regionsDelayedForCrossfade = true;
         console.log('⏳ Delaying region rendering until waveform crossfade completes');
     } else {
-        // Re-render regions for the new volcano (will be empty until data is fetched)
+        // Re-render regions for the new spacecraft (will be empty until data is fetched)
         renderRegions();
         
         // Clear canvas feature boxes (no regions loaded yet)
@@ -339,13 +343,13 @@ export function switchVolcanoRegions(newVolcano, delayRender = false) {
     }
     
     if (!isStudyMode()) {
-        console.log(`🌋 Switched to volcano: ${newVolcano} (${regionsByVolcano.get(newVolcano).length} regions)`);
+        console.log(`🌋 Switched to spacecraft: ${newSpacecraft} (${regionsBySpacecraft.get(newSpacecraft).length} regions)`);
     }
 }
 
 /**
  * Render regions after waveform crossfade completes
- * Called when loading new volcano data to delay region display until crossfade finishes
+ * Called when loading new spacecraft data to delay region display until crossfade finishes
  */
 export function renderRegionsAfterCrossfade() {
     // Only render if regions were actually delayed
@@ -389,28 +393,44 @@ function getTotalFeatureCount() {
 /**
  * Load regions from storage after data fetch completes
  * Call this after State.dataStartTime and State.dataEndTime are set
+ * Prioritizes pending shared regions (from shared links) over localStorage
  */
-export async function loadRegionsAfterDataFetch() {
-    const volcano = getCurrentVolcano();
-    if (!volcano) {
-        console.warn('⚠️ Cannot load regions - no volcano selected');
+export function loadRegionsAfterDataFetch() {
+    const spacecraft = getCurrentSpacecraft();
+    if (!spacecraft) {
+        console.warn('⚠️ Cannot load regions - no spacecraft selected');
         return;
     }
-    
-    // 🔧 DEV MODE: Don't load saved regions - start fresh for testing
-    if (isDevMode()) {
-        console.log('🔧 DEV MODE: Skipping region load (starting fresh for testing)');
-        return;
+
+    // 🔧 CRITICAL: Always clear in-memory regions first before loading
+    // This ensures old regions from previous data don't persist
+    regionsBySpacecraft.set(spacecraft, []);
+
+    // Check for pending shared regions first (from shared links)
+    let loadedRegions = null;
+    let loadedFromShareLink = false;
+    const pendingSharedRegions = sessionStorage.getItem('pendingSharedRegions');
+
+    // Start region loading group (will be closed after all loading logs)
+    const regionGroupOpen = logGroup('regions', `Loading regions for ${spacecraft}`);
+
+    if (pendingSharedRegions) {
+        try {
+            loadedRegions = JSON.parse(pendingSharedRegions);
+            loadedFromShareLink = true;
+            console.log(`🔗 From share link: ${loadedRegions.length} region(s)`);
+            // Clear the pending regions so they don't load again
+            sessionStorage.removeItem('pendingSharedRegions');
+        } catch (e) {
+            console.error('Failed to parse pending shared regions:', e);
+            sessionStorage.removeItem('pendingSharedRegions');
+        }
     }
-    
-    // 🎓 TUTORIAL IN PROGRESS: Don't load saved regions - tutorial creates fresh regions
-    const { isTutorialInProgress } = await import('./study-workflow.js');
-    if (isTutorialInProgress()) {
-        console.log('🎓 Tutorial in progress: Skipping region load (tutorial will create fresh regions)');
-        return;
+
+    // Fall back to localStorage if no shared regions
+    if (!loadedRegions) {
+        loadedRegions = loadRegionsFromStorage(spacecraft);
     }
-    
-    const loadedRegions = loadRegionsFromStorage(volcano);
     if (loadedRegions && loadedRegions.length > 0) {
         // 🔧 CRITICAL FIX: Recalculate sample indices from timestamps!
         // Sample indices are relative to the current data fetch and MUST be recalculated
@@ -455,27 +475,121 @@ export async function loadRegionsAfterDataFetch() {
                     console.log(`🔧 Recalculated samples: ${oldEndSample?.toLocaleString()} → ${region.endSample.toLocaleString()} (end)`);
                 }
             }
+
+            // Initialize missing fields for shared regions
+            if (!region.features) {
+                region.features = [{
+                    type: 'Impulsive',
+                    repetition: 'Unique',
+                    lowFreq: '',
+                    highFreq: '',
+                    startTime: '',
+                    endTime: '',
+                    notes: '',
+                    speedFactor: 1
+                }];
+            }
+            if (region.featureCount === undefined) {
+                region.featureCount = region.features.length || 1;
+            }
+            if (region.expanded === undefined) {
+                region.expanded = false;
+            }
+            if (region.playing === undefined) {
+                region.playing = false;
+            }
         });
         
-        regionsByVolcano.set(volcano, loadedRegions);
-        console.log(`📂 Restored ${loadedRegions.length} region(s) for ${volcano} from localStorage after data fetch`);
-        
-        // 🔧 FIX: Don't render regions here - wait for waveform crossfade to complete
-        // Regions will be rendered by renderRegionsAfterCrossfade() after crossfade finishes
-        // This prevents regions from appearing before the high-pass waveform crossfade completes
-        
-        // 🔥 Set delay flag to prevent drawRegionHighlights/drawRegionButtons from drawing immediately
-        regionsDelayedForCrossfade = true;
-        console.log('⏳ Regions loaded but delayed for waveform crossfade');
-        
-        // NOTE: Canvas feature boxes are automatically drawn by updatePlaybackSpeed() 
-        // (called in data-fetcher.js after data loads). No need to explicitly call here.
-        // This avoids duplicate work since updatePlaybackSpeed() -> redrawAllCanvasFeatureBoxes()
-        
+        regionsBySpacecraft.set(spacecraft, loadedRegions);
+        console.log(`📂 Restored ${loadedRegions.length} region(s) from ${loadedFromShareLink ? 'share link' : 'localStorage'}`);
+
+        // 🔗 CRITICAL: If regions came from share link, save them to localStorage
+        // This ensures they persist across page refreshes after the URL is consumed
+        if (loadedFromShareLink) {
+            saveRegionsToStorage(spacecraft, loadedRegions);
+            console.log(`💾 Saved to localStorage for future sessions`);
+        }
+
+        // 🔥 Render regions immediately (don't wait for crossfade)
+        // Regions need to be visible as soon as data loads
+        renderRegions();
+        redrawAllCanvasFeatureBoxes();
+        drawWaveformWithSelection();
+        console.log('✅ Rendered');
+        if (regionGroupOpen) logGroupEnd();
+
         // Update button states
         updateCompleteButtonState();
     } else {
-        console.log(`📂 No saved regions found for ${volcano}`);
+        console.log(`📂 No saved regions found`);
+        if (regionGroupOpen) logGroupEnd();
+        // 🔧 CRITICAL: Still need to re-render to clear any old regions from display
+        renderRegions();
+        redrawAllCanvasFeatureBoxes();
+        drawWaveformWithSelection();
+        updateCompleteButtonState();
+    }
+
+    // Check for pending view settings (from shared links) and apply zoom after a delay
+    const pendingViewSettings = sessionStorage.getItem('pendingSharedViewSettings');
+    if (pendingViewSettings) {
+        try {
+            const viewSettings = JSON.parse(pendingViewSettings);
+            sessionStorage.removeItem('pendingSharedViewSettings');
+
+            const viewGroupOpen = logGroup('share', 'Restoring shared view settings');
+
+            // Apply colormap if specified
+            if (viewSettings.colormap) {
+                console.log(`Colormap: ${viewSettings.colormap}`);
+                const colormapSelect = document.getElementById('colormap');
+                if (colormapSelect) {
+                    colormapSelect.value = viewSettings.colormap;
+                    changeColormap();
+                }
+            }
+
+            // Apply FFT size if specified
+            if (viewSettings.fft_size) {
+                console.log(`FFT size: ${viewSettings.fft_size}`);
+                const fftSizeSelect = document.getElementById('fftSize');
+                if (fftSizeSelect) {
+                    fftSizeSelect.value = viewSettings.fft_size.toString();
+                    changeFftSize();
+                }
+            }
+
+            // Apply frequency scale if specified
+            if (viewSettings.frequency_scale) {
+                console.log(`Frequency scale: ${viewSettings.frequency_scale}`);
+                const freqScaleSelect = document.getElementById('frequencyScale');
+                if (freqScaleSelect) {
+                    freqScaleSelect.value = viewSettings.frequency_scale;
+                    changeFrequencyScale();
+                }
+            }
+
+            // Apply zoom after a 1-second delay to let the UI settle
+            if (viewSettings.zoom && viewSettings.zoom.mode === 'region') {
+                console.log(`Zoom: region ${viewSettings.zoom.region_id} (delayed 1s)`);
+                setTimeout(() => {
+                    // Find the region by ID and zoom to it
+                    const regions = getCurrentRegions();
+                    const regionIndex = regions.findIndex(r => r.id === viewSettings.zoom.region_id);
+                    if (regionIndex !== -1) {
+                        log('share', `Zoomed to region: ${viewSettings.zoom.region_id}`);
+                        zoomToRegion(regionIndex);
+                    } else {
+                        log('share', 'Shared region not found, staying at full view');
+                    }
+                }, 1000);
+            }
+
+            if (viewGroupOpen) logGroupEnd();
+        } catch (e) {
+            console.error('Failed to parse pending view settings:', e);
+            sessionStorage.removeItem('pendingSharedViewSettings');
+        }
     }
 }
 
@@ -483,7 +597,7 @@ export async function loadRegionsAfterDataFetch() {
  * Initialize region tracker
  * Sets up event listeners and prepares UI
  * NOTE: Regions are NOT loaded here - they are only loaded after fetchData is called
- * This ensures we know the volcano and time range before loading regions
+ * This ensures we know the spacecraft and time range before loading regions
  */
 export function initRegionTracker() {
     // Only log in dev/personal modes, not study mode
@@ -494,12 +608,12 @@ export function initRegionTracker() {
     // Initialize buttons renderer (must be after all variables are defined)
     initializeButtonsRenderer();
     
-    // Initialize current volcano
-    currentVolcano = getCurrentVolcano();
-    if (currentVolcano) {
+    // Initialize current spacecraft
+    currentSpacecraft = getCurrentSpacecraft();
+    if (currentSpacecraft) {
         // ✅ Start with empty regions - they will be loaded after fetchData is called
         // This ensures we know the time range before loading (regions outside range are filtered out)
-        regionsByVolcano.set(currentVolcano, []);
+        regionsBySpacecraft.set(currentSpacecraft, []);
     }
     
     // Region cards will appear dynamically in #regionsList
@@ -537,13 +651,37 @@ export function showAddRegionButton(selectionStart, selectionEnd) {
     const canvas = document.getElementById('waveform');
     if (!canvas) return;
     
-    // Calculate pixel positions from time values
-    const startProgress = (selectionStart / State.totalAudioDuration);
-    const endProgress = (selectionEnd / State.totalAudioDuration);
-    
     const canvasWidth = canvas.offsetWidth;
-    const startX = startProgress * canvasWidth;
-    const endX = endProgress * canvasWidth;
+    
+    // 🏛️ Use zoom-aware coordinate conversion (same as drawRegionHighlights)
+    // This ensures the button position matches where the region will actually appear
+    let startX, endX;
+    if (zoomState.isInitialized()) {
+        // Convert selection times to timestamps, then to pixels (same logic as region drawing)
+        const dataStartMs = State.dataStartTime.getTime();
+        const selectionStartMs = dataStartMs + (selectionStart * 1000);
+        const selectionEndMs = dataStartMs + (selectionEnd * 1000);
+        const selectionStartTimestamp = new Date(selectionStartMs);
+        const selectionEndTimestamp = new Date(selectionEndMs);
+        
+        // Use interpolated time range for positioning (matches region drawing)
+        const interpolatedRange = getInterpolatedTimeRange();
+        const displayStartMs = interpolatedRange.startTime.getTime();
+        const displayEndMs = interpolatedRange.endTime.getTime();
+        const displaySpanMs = displayEndMs - displayStartMs;
+        
+        const startProgress = (selectionStartMs - displayStartMs) / displaySpanMs;
+        const endProgress = (selectionEndMs - displayStartMs) / displaySpanMs;
+        
+        startX = startProgress * canvasWidth;
+        endX = endProgress * canvasWidth;
+    } else {
+        // Fallback to old behavior if zoom state not initialized
+        const startProgress = (selectionStart / State.totalAudioDuration);
+        const endProgress = (selectionEnd / State.totalAudioDuration);
+        startX = startProgress * canvasWidth;
+        endX = endProgress * canvasWidth;
+    }
     
     // Create or get button - attach to body for free-floating positioning
     if (!addRegionButton) {
@@ -675,27 +813,18 @@ export function createRegionFromSelectionTimes(selectionStartSeconds, selectionE
         return;
     }
     
-    console.log('🎯 Creating region from selection:', selectionStartSeconds, '-', selectionEndSeconds, 'seconds');
-    console.log('   Data start:', State.dataStartTime);
-    console.log('   Total audio duration:', State.totalAudioDuration);
-    
     // 🏛️ Convert selection times to absolute sample indices (the eternal truth)
     const startSample = zoomState.timeToSample(selectionStartSeconds);
     const endSample = zoomState.timeToSample(selectionEndSeconds);
-    
+
     // Convert to real-world timestamps (for display/export)
     const startTimestamp = zoomState.sampleToRealTimestamp(startSample);
     const endTimestamp = zoomState.sampleToRealTimestamp(endSample);
-    
+
     const startTime = startTimestamp ? startTimestamp.toISOString() : null;
     const endTime = endTimestamp ? endTimestamp.toISOString() : null;
-    
-    console.log('   Region start sample:', startSample.toLocaleString());
-    console.log('   Region end sample:', endSample.toLocaleString());
-    console.log('   Region start time:', startTime);
-    console.log('   Region end time:', endTime);
-    
-    // Get current volcano's regions
+
+    // Get current spacecraft's regions
     const regions = getCurrentRegions();
     
     // Collapse all existing regions before adding new one
@@ -772,45 +901,19 @@ export function createRegionFromSelectionTimes(selectionStartSeconds, selectionE
     // Hide the add region button
     hideAddRegionButton();
     
-    // 🔥 DEBUG: Log all tutorial state when region is created
-    console.log('🟡🟡🟡 [REGION CREATED] Tutorial state check:');
-    console.log(`🟡 waitingForRegionCreation: ${State.waitingForRegionCreation}`);
-    console.log(`🟡 _regionCreationResolve: ${State._regionCreationResolve ? 'EXISTS' : 'null'}`);
-    console.log(`🟡 _waveformClickResolve: ${State._waveformClickResolve ? 'EXISTS' : 'null'}`);
-    console.log(`🟡 waitingForSelection: ${State.waitingForSelection}`);
-    console.log(`🟡 _selectionTutorialResolve: ${State._selectionTutorialResolve ? 'EXISTS' : 'null'}`);
-
     // 🔥 Resolve tutorial promise if waiting for region creation
     if (State.waitingForRegionCreation && State._regionCreationResolve) {
-        console.log('🟡 [REGION CREATED] ✅ Resolving _regionCreationResolve');
         State._regionCreationResolve();
         State.setRegionCreationResolve(null);
         State.setWaitingForRegionCreation(false);
     }
-
-    // 🔥 User got ahead and created a region - resolve ALL pending tutorial promises!
-    // This can happen at waitForWaveformClick OR waitForSelection stage
-    if (State._waveformClickResolve) {
-        console.log('🟡 [REGION CREATED] ✅ Resolving _waveformClickResolve (user got ahead!)');
-        State._waveformClickResolve();
-        State.setWaveformClickResolve(null);
-    }
-    if (State.waitingForSelection && State._selectionTutorialResolve) {
-        console.log('🟡 [REGION CREATED] ✅ Resolving _selectionTutorialResolve (user got ahead!)');
-        State._selectionTutorialResolve();
-        State.setSelectionTutorialResolve(null);
-        State.setWaitingForSelection(false);
-    }
     
     // Update status message with region number (1-indexed)
-    // Skip status message during tutorial
-    if (!isTutorialActive()) {
-        const regionNumber = newRegionIndex + 1;
-        const statusEl = document.getElementById('status');
-        if (statusEl) {
-            statusEl.className = 'status info';
-            statusEl.textContent = `Type (${regionNumber}) to zoom into this region, or click the magnifier button.`;
-        }
+    const regionNumber = newRegionIndex + 1;
+    const statusEl = document.getElementById('status');
+    if (statusEl) {
+        statusEl.className = 'status info';
+        statusEl.textContent = `Type (${regionNumber}) to zoom into this region, or click the magnifier button.`;
     }
     
     // Clear the yellow selection box by clearing selection state
@@ -1385,18 +1488,16 @@ export function handleWaveformClick(event, canvas) {
  */
 export function stopFrequencySelection() {
     // 🔍 DEBUG: Log state before stopping selection
-    if (!isStudyMode()) {
-        console.log('🔴 [DEBUG] STOP_FREQUENCY_SELECTION CALLED:', {
-            wasSelectingFrequency: isSelectingFrequency,
-            hadCurrentSelection: !!currentFrequencySelection,
-            currentSelection: currentFrequencySelection,
-            documentHasFocus: document.hasFocus(),
-            windowHasFocus: document.visibilityState === 'visible'
-        });
-    }
+    console.log('🔴 [DEBUG] STOP_FREQUENCY_SELECTION CALLED:', {
+        wasSelectingFrequency: isSelectingFrequency,
+        hadCurrentSelection: !!currentFrequencySelection,
+        currentSelection: currentFrequencySelection,
+        documentHasFocus: document.hasFocus(),
+        windowHasFocus: document.visibilityState === 'visible'
+    });
     
     if (!isSelectingFrequency) {
-        if (!isStudyMode()) console.log('🔴 [DEBUG] Not in frequency selection mode - nothing to stop');
+        console.log('🔴 [DEBUG] Not in frequency selection mode - nothing to stop');
         return;
     }
     
@@ -1406,7 +1507,7 @@ export function stopFrequencySelection() {
     isSelectingFrequency = false;
     currentFrequencySelection = null;
     
-    if (!isStudyMode()) console.log('🔴 [DEBUG] Frequency selection stopped - canceling any active selection box');
+    console.log('🔴 [DEBUG] Frequency selection stopped - canceling any active selection box');
     
     // Cancel any active selection box (remove red box stuck to mouse)
     cancelSpectrogramSelection();
@@ -1541,25 +1642,24 @@ export function startFrequencySelection(regionIndex, featureIndex) {
  * Called when user completes a box selection on spectrogram
  */
 export async function handleSpectrogramSelection(startY, endY, canvasHeight, startX, endX, canvasWidth) {
-    if (!isStudyMode()) {
-        console.log('🟢 [DEBUG] HANDLE_SPECTROGRAM_SELECTION CALLED');
-    }
+    console.log('🟢 [DEBUG] HANDLE_SPECTROGRAM_SELECTION CALLED');
 
-    // 🎯 Check if user clicked a specific feature's "re-select" button
-    // If so, use that exact feature instead of finding incomplete ones
     let regionIndex;
     let featureIndex;
+    const regions = getCurrentRegions();
 
+    // 🔥 FIX: Check if user explicitly clicked a button to reselect a specific feature
     if (currentFrequencySelection) {
-        // User clicked "Click to re-select feature" button - use that specific feature
+        // User clicked a button - use that specific feature (reselection)
         regionIndex = currentFrequencySelection.regionIndex;
         featureIndex = currentFrequencySelection.featureIndex;
+        console.log(`🎯 Using explicit selection: region ${regionIndex + 1}, feature ${featureIndex + 1}`);
 
-        if (!isStudyMode()) {
-            console.log('🎯 Using specific feature from button click:', { regionIndex, featureIndex });
-        }
+        // Clear it so next draw creates a new feature (one-shot reselection)
+        currentFrequencySelection = null;
+        isSelectingFrequency = false;
     } else {
-        // 🎯 Auto-determine which feature to fill in
+        // Auto-determine which feature to fill in
         // Find the active region and either use incomplete feature or create new one
         const activeRegionIndex = getActiveRegionIndex();
         if (activeRegionIndex === null) {
@@ -1567,7 +1667,6 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
             return;
         }
 
-        const regions = getCurrentRegions();
         const region = regions[activeRegionIndex];
         if (!region) {
             console.warn('⚠️ Active region not found');
@@ -1592,50 +1691,37 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
         }
 
         regionIndex = activeRegionIndex;
-    }
-
-    // Get regions array for updating
-    const regions = getCurrentRegions();
-    const region = regions[regionIndex];
-    if (!region) {
-        console.warn('⚠️ Region not found');
-        return;
-    }
-
-    if (!isStudyMode()) {
         console.log(`🎯 Auto-selected feature: region ${regionIndex + 1}, feature ${featureIndex + 1}`);
-        console.log('🎯 ========== MOUSE UP: Feature Selection Complete ==========');
-        console.log('📍 Canvas coordinates (pixels):', {
-            startX: startX?.toFixed(1),
-            endX: endX?.toFixed(1),
-            startY: startY?.toFixed(1),
-            endY: endY?.toFixed(1),
-            canvasWidth,
-            canvasHeight
-        });
     }
+    
+    console.log('🎯 ========== MOUSE UP: Feature Selection Complete ==========');
+    console.log('📍 Canvas coordinates (pixels):', {
+        startX: startX?.toFixed(1),
+        endX: endX?.toFixed(1),
+        startY: startY?.toFixed(1),
+        endY: endY?.toFixed(1),
+        canvasWidth,
+        canvasHeight
+    });
     
     // Convert Y positions to frequencies (with playbackRate for accurate conversion!)
     const playbackRate = State.currentPlaybackRate || 1.0;
 
-    // Get ACTUAL Nyquist from metadata (NOT hardcoded 50!)
-    const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
-    const originalNyquist = originalSampleRate / 2;
+    // Use same source as Y-axis for consistency
+    const originalNyquist = State.originalDataFrequencyRange?.max || 50;
 
     const lowFreq = getFrequencyFromY(Math.max(startY, endY), originalNyquist, canvasHeight, State.frequencyScale, playbackRate);
     const highFreq = getFrequencyFromY(Math.min(startY, endY), originalNyquist, canvasHeight, State.frequencyScale, playbackRate);
 
-    if (!isStudyMode()) {
-        console.log('🎵 Converted to frequencies (Hz):', {
-            startY_device: Math.min(startY, endY).toFixed(1),
-            endY_device: Math.max(startY, endY).toFixed(1),
-            canvasHeight_device: canvasHeight,
-            lowFreq: lowFreq.toFixed(2),
-            highFreq: highFreq.toFixed(2),
-            playbackRate: playbackRate.toFixed(2),
-            frequencyScale: State.frequencyScale
-        });
-    }
+    console.log('🎵 Converted to frequencies (Hz):', {
+        startY_device: Math.min(startY, endY).toFixed(1),
+        endY_device: Math.max(startY, endY).toFixed(1),
+        canvasHeight_device: canvasHeight,
+        lowFreq: lowFreq.toFixed(2),
+        highFreq: highFreq.toFixed(2),
+        playbackRate: playbackRate.toFixed(2),
+        frequencyScale: State.frequencyScale
+    });
     
     // Convert X positions to timestamps
     let startTime = null;
@@ -1649,13 +1735,11 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
             const startTimestamp = zoomState.sampleToRealTimestamp(startSample);
             const endTimestamp = zoomState.sampleToRealTimestamp(endSample);
             
-            if (!isStudyMode()) {
-                console.log('🏛️ Converted to samples (eternal coordinates):', {
-                    startSample: startSample.toLocaleString(),
-                    endSample: endSample.toLocaleString(),
-                    sampleRate: zoomState.sampleRate
-                });
-            }
+            console.log('🏛️ Converted to samples (eternal coordinates):', {
+                startSample: startSample.toLocaleString(),
+                endSample: endSample.toLocaleString(),
+                sampleRate: zoomState.sampleRate
+            });
             
             if (startTimestamp && endTimestamp) {
                 // Ensure start is before end
@@ -1665,12 +1749,10 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
                 startTime = new Date(actualStartMs).toISOString();
                 endTime = new Date(actualEndMs).toISOString();
                 
-                if (!isStudyMode()) {
-                    console.log('📅 Converted to timestamps:', {
-                        startTime,
-                        endTime
-                    });
-                }
+                console.log('📅 Converted to timestamps:', {
+                    startTime,
+                    endTime
+                });
             }
         } else {
             // Fallback to old behavior if zoom state not initialized
@@ -1708,27 +1790,21 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
             regions[regionIndex].features[featureIndex].endTime = endTime;
         }
         
-        if (!isStudyMode()) {
-            console.log('💾 SAVED to feature data:', {
-                regionIndex,
-                featureIndex,
-                lowFreq: lowFreq.toFixed(2),
-                highFreq: highFreq.toFixed(2),
-                startTime,
-                endTime
-            });
-            console.log('🎯 ========== END Feature Selection ==========\n');
-        }
+        console.log('💾 SAVED to feature data:', {
+            regionIndex,
+            featureIndex,
+            lowFreq: lowFreq.toFixed(2),
+            highFreq: highFreq.toFixed(2),
+            startTime,
+            endTime
+        });
+        console.log('🎯 ========== END Feature Selection ==========\n');
         
         setCurrentRegions(regions);
-
-        // 🎯 Clear selection state after saving (so next selection auto-finds incomplete feature)
-        isSelectingFrequency = false;
-        currentFrequencySelection = null;
-
+        
         // 🎯 NEW ARCHITECTURE: Return region/feature indices for canvas box storage
         // (OLD: used to call addFeatureBox() to create orange DOM boxes - now using pure canvas!)
-
+        
         // Re-render the feature
         renderFeatures(regions[regionIndex].id, regionIndex);
         
@@ -1798,28 +1874,19 @@ export async function handleSpectrogramSelection(startY, endY, canvasHeight, sta
  * Convert Y position to frequency based on scale type
  * 🔗 INVERSE of getYPositionForFrequencyScaled() from axis renderer
  * This MUST produce frequencies in the ORIGINAL scale (not stretched by playback)
- * 
- * 🚨 LOGARITHMIC FORMULA FIX (2025-11-25):
- * Prior to this fix, the logarithmic stretch factor was calculated incorrectly:
- *   OLD (BROKEN): stretchFactor = log10(maxFreq * playbackRate) / log10(maxFreq)
- *   NEW (CORRECT): Uses same formula as calculateStretchFactorForLog() in axis renderer
- * 
- * This caused frequency values to be saved incorrectly when playbackRate != 1.
- * Submissions after this fix have usesCorrectedLogFormula: true in the JSON dump.
- * See: docs/LOG_FREQUENCY_CONVERSION_CHANGE.md
  */
 function getFrequencyFromY(y, maxFreq, canvasHeight, scaleType, playbackRate = 1.0) {
+    const minFreq = getLogScaleMinFreq();
+
     if (scaleType === 'logarithmic') {
-        // 🦋 LOGARITHMIC: Must use SAME stretch factor as getYPositionForFrequencyScaled!
-        // Forward: heightFromBottom_scaled = heightFromBottom_1x * stretchFactor
-        // Inverse: heightFromBottom_1x = heightFromBottom_scaled / stretchFactor
-        const logMin = Math.log10(State.MIN_FREQUENCY_HZ);
+        // Must use SAME stretch factor as getYPositionForFrequencyScaled!
+        const logMin = Math.log10(minFreq);
         const logMax = Math.log10(maxFreq);
         const logRange = logMax - logMin;
 
         // Calculate stretch factor using SAME formula as calculateStretchFactorForLog
-        const targetMaxFreq = maxFreq / playbackRate;
-        const logTargetMax = Math.log10(Math.max(targetMaxFreq, State.MIN_FREQUENCY_HZ));
+        const targetMaxFreq = maxFreq / playbackRate;  // DIVISION, not multiplication!
+        const logTargetMax = Math.log10(Math.max(targetMaxFreq, minFreq));
         const targetLogRange = logTargetMax - logMin;
         const fraction = targetLogRange / logRange;
         const stretchFactor = 1 / fraction;
@@ -1833,57 +1900,59 @@ function getFrequencyFromY(y, maxFreq, canvasHeight, scaleType, playbackRate = 1
         const logFreq = logMin + (normalizedLog * (logMax - logMin));
         const freq = Math.pow(10, logFreq);
 
-        // NO CLAMPING - allow full range
-        return freq;
+        // Don't clamp to minFreq - allow the natural log scale result
+        return Math.max(0, Math.min(maxFreq, freq));
     } else {
         // Linear and sqrt: These ARE homogeneous - freq gets scaled by playbackRate
-        // Forward: effectiveFreq = freq * playbackRate, then normalize
+        // Forward: effectiveFreq = freq * playbackRate, then normalize from minFreq to maxFreq
         // Inverse: normalize → effectiveFreq, then divide by playbackRate
         const normalizedY = (canvasHeight - y) / canvasHeight;
 
         if (scaleType === 'sqrt') {
-            // Reverse sqrt
+            // Reverse sqrt: normalized = sqrt((freq - minFreq) / (maxFreq - minFreq))
+            // So: freq = normalized^2 * (maxFreq - minFreq) + minFreq
             const normalized = normalizedY * normalizedY;
-            const effectiveFreq = normalized * maxFreq;
+            const effectiveFreq = normalized * (maxFreq - minFreq) + minFreq;
             const freq = effectiveFreq / playbackRate;
 
-            // NO CLAMPING - allow full range
-            return freq;
+            // CLAMP to valid range [minFreq, maxFreq]
+            return Math.max(minFreq, Math.min(maxFreq, freq));
         } else {
-            // Linear
-            const effectiveFreq = normalizedY * maxFreq;
+            // Linear: normalized = (freq - minFreq) / (maxFreq - minFreq)
+            // So: freq = normalized * (maxFreq - minFreq) + minFreq
+            const effectiveFreq = normalizedY * (maxFreq - minFreq) + minFreq;
             const freq = effectiveFreq / playbackRate;
 
-            // NO CLAMPING - allow full range
-            return freq;
+            // CLAMP to valid range [minFreq, maxFreq]
+            return Math.max(minFreq, Math.min(maxFreq, freq));
         }
     }
 }
 
 /**
  * Format time for display (HH:MM format)
- * CONVERTS UTC TO LOCAL TIME for display (matches x-axis behavior)
+ * Displays in UTC for space physics data
  */
 function formatTime(isoString) {
-    const date = new Date(isoString); // This is UTC
-    // Get LOCAL time components (just like x-axis does!)
-    const hours = String(date.getHours()).padStart(2, '0'); // Local!
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const date = new Date(isoString);
+    // Get UTC time components
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
 }
 
 /**
  * Format time for display with seconds (H:MM:SS format, no leading zero on hours if < 10)
- * CONVERTS UTC TO LOCAL TIME for display (matches x-axis behavior)
+ * Displays in UTC for space physics data
  */
 function formatTimeWithSeconds(isoString) {
-    const date = new Date(isoString); // This is UTC
-    
-    // Get LOCAL time components (just like x-axis does!)
-    const hours = date.getHours(); // Local hours (0-23), no padding - single digit for 0-9
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    
+    const date = new Date(isoString);
+
+    // Get UTC time components
+    const hours = date.getUTCHours(); // UTC hours (0-23), no padding - single digit for 0-9
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+
     return `${hours}:${minutes}:${seconds}`;
 }
 
@@ -2000,7 +2069,7 @@ function renderRegions() {
                     // Update region number display (preserve original index)
                     const regionLabel = card.querySelector('.region-label');
                     if (regionLabel) {
-                        regionLabel.textContent = `Region ${originalIndex + 1}`;
+                        regionLabel.textContent = `${isMobileScreen() ? 'Reg' : 'Region'} ${originalIndex + 1}`;
                     }
                     // Update data attributes for event handlers
                     updateRegionCardDataAttributes(card, originalIndex);
@@ -2087,7 +2156,7 @@ function renderRegions() {
                     // Update region number display (preserve original index)
                     const regionLabel = card.querySelector('.region-label');
                     if (regionLabel) {
-                        regionLabel.textContent = `Region ${originalIndex + 1}`;
+                        regionLabel.textContent = `${isMobileScreen() ? 'Reg' : 'Region'} ${originalIndex + 1}`;
                     }
                     // Update data attributes for event handlers
                     updateRegionCardDataAttributes(card, originalIndex);
@@ -2115,7 +2184,7 @@ function renderRegions() {
                     }
                     const regionLabel = card.querySelector('.region-label');
                     if (regionLabel) {
-                        regionLabel.textContent = `Region ${originalIndex + 1}`;
+                        regionLabel.textContent = `${isMobileScreen() ? 'Reg' : 'Region'} ${originalIndex + 1}`;
                     }
                     updateRegionCardDataAttributes(card, originalIndex);
                 }
@@ -2184,7 +2253,7 @@ function createRegionCard(region, index) {
                 title="Play region">
             ${region.playing ? '⏸' : '▶'}
         </button>
-        <span class="region-label">Region ${index + 1}</span>
+        <span class="region-label">${isMobileScreen() ? 'Reg' : 'Region'} ${index + 1}</span>
         <div class="region-summary">
             <div class="region-time-display">
                 ${formatTime(region.startTime)} – ${formatTime(region.stopTime)}
@@ -2330,10 +2399,23 @@ function createRegionCard(region, index) {
 function renderFeatures(regionId, regionIndex) {
     const container = document.getElementById(`features-${regionId}`);
     if (!container) return;
-    
+
     const regions = getCurrentRegions();
     const region = regions[regionIndex];
-    
+    if (!region) {
+        console.warn(`⚠️ renderFeatures: Region at index ${regionIndex} not found`);
+        return;
+    }
+
+    // Initialize features array if missing (fallback - should be handled in loadRegionsAfterDataFetch)
+    if (!region.features) {
+        console.warn(`⚠️ renderFeatures: Region ${region.id} missing features array - initializing`);
+        region.features = [];
+    }
+    if (region.featureCount === undefined) {
+        region.featureCount = 1;
+    }
+
     // Ensure featureCount matches features array length
     while (region.features.length < region.featureCount) {
         region.features.push({
@@ -2451,6 +2533,32 @@ function renderFeatures(regionId, regionIndex) {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 this.blur();
+            }
+            // Tab to next feature's notes field (wrap to first)
+            if (event.key === 'Tab' && !event.shiftKey) {
+                event.preventDefault();
+                const nextNotesField = document.getElementById(`notes-${regionIndex}-${featureIndex + 1}`);
+                if (nextNotesField) {
+                    nextNotesField.focus();
+                } else {
+                    // Wrap to first feature
+                    const firstNotesField = document.getElementById(`notes-${regionIndex}-0`);
+                    if (firstNotesField) firstNotesField.focus();
+                }
+            }
+            // Shift+Tab to previous feature's notes field (wrap to last)
+            if (event.key === 'Tab' && event.shiftKey) {
+                event.preventDefault();
+                const prevNotesField = document.getElementById(`notes-${regionIndex}-${featureIndex - 1}`);
+                if (prevNotesField) {
+                    prevNotesField.focus();
+                } else {
+                    // Wrap to last feature
+                    let lastIndex = 0;
+                    while (document.getElementById(`notes-${regionIndex}-${lastIndex + 1}`)) lastIndex++;
+                    const lastNotesField = document.getElementById(`notes-${regionIndex}-${lastIndex}`);
+                    if (lastNotesField) lastNotesField.focus();
+                }
             }
         });
         
@@ -2982,10 +3090,8 @@ export function addFeature(regionIndex) {
             });
         });
         
-        // Auto-enter selection mode for the newly added feature
-        setTimeout(() => {
-            startFrequencySelection(regionIndex, newCount - 1);
-        }, 100);
+        // Note: We don't auto-start selection here - it caused bugs when drawing rapidly
+        // zoomToRegion handles auto-selecting incomplete features when entering a region
     } else {
         // Just update instantly (when collapsed)
         renderFeatures(region.id, regionIndex);
@@ -3067,10 +3173,11 @@ export function deleteRegion(index) {
         const regions = getCurrentRegions();
         const deletedRegion = regions[index];
 
-        // Check if user is zoomed into the region being deleted
-        const wasZoomedIntoDeletedRegion = zoomState.isInRegion() && deletedRegion && zoomState.getCurrentRegionId() === deletedRegion.id;
+        // If user is currently zoomed into this region, zoom out first
+        if (zoomState.isInRegion() && zoomState.getCurrentRegionId() === deletedRegion.id) {
+            zoomToFull();
+        }
 
-        // Delete the region from in-memory array (setCurrentRegions saves to localStorage)
         regions.splice(index, 1);
         setCurrentRegions(regions);
         if (activeRegionIndex === index) {
@@ -3078,22 +3185,15 @@ export function deleteRegion(index) {
         } else if (activeRegionIndex > index) {
             activeRegionIndex--;
         }
-
-        // If user was zoomed into the deleted region, zoom out now
-        if (wasZoomedIntoDeletedRegion) {
-            zoomToFull();
-        } else {
-            // Only render regions if not zooming out (zoomToFull handles its own renderRegions)
-            renderRegions();
-        }
-
+        renderRegions();
+        
         // ✅ Rebuild canvas boxes (removes boxes for deleted region!)
         redrawAllCanvasFeatureBoxes();
-
+        
         // Update complete button state (in case we deleted the last identified feature)
         updateCompleteButtonState(); // Begin Analysis button
         updateCmpltButtonState(); // Complete button
-
+        
         // Redraw waveform to update button positions
         drawWaveformWithSelection();
     }
@@ -3185,13 +3285,14 @@ export function zoomToRegion(regionIndex) {
         return;
     }
 
+    // 📱 Mobile: Enable touch drawing on spectrogram when zoomed in
+    updateSpectrogramTouchMode(true);
+
     // Timestamps calculated from region.startTime/stopTime (our only source of truth!)
     const dataStartMs = State.dataStartTime.getTime();
     const dataEndMs = State.dataEndTime.getTime();
     const regionStartMs = new Date(region.startTime).getTime();
     const regionEndMs = new Date(region.stopTime).getTime();
-
-    // console.log(`🔍 Zooming into region ${regionIndex + 1} (samples ${region.startSample.toLocaleString()}-${region.endSample.toLocaleString()})`);
     
     // console.log('🔍 ========== ZOOM IN: Starting Region Zoom ==========');
     // console.log('🏛️ Region data:', {
@@ -3267,10 +3368,9 @@ export function zoomToRegion(regionIndex) {
     }
     
     // 🙏 Timestamps as a source of truth: Calculate seconds from timestamps
-    // (regionStartMs, regionEndMs, dataStartMs already calculated above at lines 2808-2811)
     const regionStartSeconds = (regionStartMs - dataStartMs) / 1000;
     const regionEndSeconds = (regionEndMs - dataStartMs) / 1000;
-    
+
     // 🎯 MAGIC TRICK: Predictive rendering with smart quality zones!
     // Detect zoom direction and calculate expanded render window
     // 🔥 FIX: Get current visual position (where we are NOW, even mid-transition)
@@ -3316,16 +3416,7 @@ export function zoomToRegion(regionIndex) {
     const dataEndSeconds = (State.dataEndTime.getTime() - dataStartMs) / 1000;
     expandedStartSeconds = Math.max(dataStartSeconds, expandedStartSeconds);
     expandedEndSeconds = Math.min(dataEndSeconds, expandedEndSeconds);
-    
-    // console.log('🎯 Smart render window:', {
-    //     direction: zoomDirection,
-    //     target: `${regionStartSeconds.toFixed(2)}s - ${regionEndSeconds.toFixed(2)}s`,
-    //     expanded: `${expandedStartSeconds.toFixed(2)}s - ${expandedEndSeconds.toFixed(2)}s`,
-    //     targetDuration: regionDuration.toFixed(2),
-    //     expandedDuration: (expandedEndSeconds - expandedStartSeconds).toFixed(2),
-    //     multiplier: ((expandedEndSeconds - expandedStartSeconds) / regionDuration).toFixed(1) + 'x'
-    // });
-    
+
     // Set viewport to region timestamps directly
     // No sample calculations - just store the eternal timestamps
     zoomState.setViewportToRegion(region.startTime, region.stopTime, region.id);
@@ -3461,7 +3552,10 @@ export function zoomToRegion(regionIndex) {
         
         // Update feature box positions after zoom transition completes
         updateAllFeatureBoxPositions();
-        
+
+        // 🎯 CRITICAL: Redraw x-axis so tick density updates for the new region!
+        drawWaveformXAxis();
+
         // Rebuild waveform (fast)
         drawWaveform();
         
@@ -3527,28 +3621,29 @@ export function zoomToRegion(regionIndex) {
  * Zoom back out to full view
  */
 export function zoomToFull() {
-    if (!isStudyMode()) {
-        console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomToFull() called');
-        console.log('🔍 [ZOOM_TO_FULL DEBUG] State.waitingForZoomOut:', State.waitingForZoomOut);
-        console.log('🔍 [ZOOM_TO_FULL DEBUG] State._zoomOutResolve exists:', !!State._zoomOutResolve);
-    }
-    
+    // console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomToFull() called');
+    // console.log('🔍 [ZOOM_TO_FULL DEBUG] State.waitingForZoomOut:', State.waitingForZoomOut);
+    // console.log('🔍 [ZOOM_TO_FULL DEBUG] State._zoomOutResolve exists:', !!State._zoomOutResolve);
+
     // 🎓 Tutorial: Resolve promise if waiting for zoom out
     if (State.waitingForZoomOut && State._zoomOutResolve) {
-        if (!isStudyMode()) console.log('🔍 [ZOOM_TO_FULL DEBUG] Resolving tutorial zoom out promise');
+        // console.log('🔍 [ZOOM_TO_FULL DEBUG] Resolving tutorial zoom out promise');
         State.setWaitingForZoomOut(false);
         const resolve = State._zoomOutResolve;
         State.setZoomOutResolve(null);
         resolve();
     }
-    
+
     if (!zoomState.isInitialized()) {
-        if (!isStudyMode()) console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomState not initialized - returning early');
+        // console.log('🔍 [ZOOM_TO_FULL DEBUG] zoomState not initialized - returning early');
         return;
     }
-    
-    if (!isStudyMode()) console.log('🔍 [ZOOM_TO_FULL DEBUG] Continuing with zoom out...');
-    
+
+    // 📱 Mobile: Disable touch drawing, allow scrolling when zoomed out
+    updateSpectrogramTouchMode(false);
+
+    // console.log('🔍 [ZOOM_TO_FULL DEBUG] Continuing with zoom out...');
+
     // console.log('🌍 Zooming to full view');
     // console.log('🔙 ZOOMING OUT TO FULL VIEW starting');
     
@@ -3609,12 +3704,10 @@ export function zoomToFull() {
     cacheZoomedSpectrogram();
 
     // 🔍 DIAGNOSTIC: Log canvas states BEFORE zoom-out starts
-    if (!isStudyMode()) {
-        console.log(`🔍 ZOOM OUT START - Canvas states:`, {
-            infiniteCanvas: getInfiniteCanvasStatus ? getInfiniteCanvasStatus() : 'NO STATUS FUNCTION',
-            cachedFull: getCachedFullStatus ? getCachedFullStatus() : 'NO STATUS FUNCTION'
-        });
-    }
+    console.log(`🔍 ZOOM OUT START - Canvas states:`, {
+        infiniteCanvas: getInfiniteCanvasStatus ? getInfiniteCanvasStatus() : 'NO STATUS FUNCTION',
+        cachedFull: getCachedFullStatus ? getCachedFullStatus() : 'NO STATUS FUNCTION'
+    });
 
     // 🙏 Timestamps as source of truth: Return viewport to full data range
     // No sample calculations - just restore the eternal timestamp boundaries
@@ -3703,7 +3796,10 @@ export function zoomToFull() {
         
         // Update feature box positions after zoom transition completes
         updateAllFeatureBoxPositions();
-        
+
+        // 🎯 Redraw x-axis so tick density updates for full view
+        drawWaveformXAxis();
+
         // Rebuild waveform to ensure it's up to date (if we used cached version)
         if (State.cachedFullWaveformCanvas) {
             drawWaveform();
@@ -3729,14 +3825,17 @@ export function zoomToFull() {
         State.setCachedFullWaveformCanvas(null);
         
         // 🔍 Diagnostic: Track zoom out complete
-        if (!isStudyMode()) console.log('✅ ZOOM OUT complete');
-        
-        // Set status message for full view (only if not in tutorial and not in showcase mode)
-        if (!isTutorialActive() && !isShowcaseMode()) {
+        console.log('✅ ZOOM OUT complete');
+
+        // Update status text to guide user
+        if (!isTutorialActive()) {
             const statusEl = document.getElementById('status');
             if (statusEl) {
-                statusEl.className = 'status info';
-                statusEl.textContent = 'Press the Complete button when you are ready to share your findings.';
+                const regions = getCurrentRegions();
+                if (regions.length > 0) {
+                    statusEl.className = 'status info';
+                    statusEl.textContent = `Click and drag to create a region, type a region # to zoom in, or click 🔍`;
+                }
             }
         }
     });
@@ -3806,45 +3905,31 @@ export async function updateCompleteButtonState() {
         return;
     }
     
-    // 🎓 CRITICAL: Check if tutorial is IN PROGRESS - if so, don't touch button at all!
-    const { isTutorialInProgress } = await import('./study-workflow.js');
-
-    if (isTutorialInProgress()) {
-        // Tutorial in progress - don't touch button, let tutorial control visibility
-        if (!isStudyMode()) {
-            console.log('🎓 Tutorial in progress - not touching button state');
-        }
-        return; // Exit early, let tutorial control it
-    }
-
-    // ✨ SHOWCASE MODE: Hide Begin Analysis button entirely
-    const { isShowcaseMode } = await import('./master-modes.js');
-    if (isShowcaseMode()) {
+    // Check if Solar Portal mode - hide button permanently
+    const { CURRENT_MODE, AppMode } = await import('./master-modes.js');
+    if (CURRENT_MODE === AppMode.SOLAR_PORTAL) {
         completeBtn.style.display = 'none';
-        console.log('✨ Begin Analysis button hidden (Showcase mode)');
-        return; // Exit early, button hidden
+        return;
     }
-
-    // 📊 RESULTS MODE: Keep Begin Analysis button disabled for results2025 user
-    const { getParticipantId } = await import('./qualtrics-api.js');
-    const participantId = getParticipantId();
-    if (participantId && participantId.toLowerCase() === 'results2025') {
-        completeBtn.style.display = 'flex';
-        completeBtn.style.alignItems = 'center';
-        completeBtn.style.justifyContent = 'center';
-        completeBtn.disabled = true;
-        completeBtn.style.opacity = '0.5';
-        completeBtn.style.cursor = 'not-allowed';
-        return; // Exit early, keep button disabled
-    }
-
-    // Not in tutorial - ensure button is visible
+    
+    // Always ensure button is visible
     completeBtn.style.display = 'flex';
     completeBtn.style.alignItems = 'center';
     completeBtn.style.justifyContent = 'center';
     
     // Check if button is in "Begin Analysis" mode (before transformation) or "Complete" mode (after)
     const isBeginAnalysisMode = completeBtn.textContent === 'Begin Analysis';
+    
+    // Check if tutorial is in progress - if so, don't override button state
+    const { isTutorialInProgress } = await import('./study-workflow.js');
+    
+    if (isTutorialInProgress()) {
+        // Tutorial in progress - don't override button state, let tutorial control it
+        if (!isStudyMode()) {
+            console.log('🎓 Tutorial in progress - not changing button state');
+        }
+        return; // Exit early, let tutorial control it
+    }
     
     // Determine what should control the button state
     let shouldDisable;

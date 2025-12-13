@@ -6,14 +6,15 @@
 import * as State from './audio-state.js';
 import { PlaybackState } from './audio-state.js';
 import { drawFrequencyAxis, positionAxisCanvas, resizeAxisCanvas, initializeAxisPlaybackRate, getYPositionForFrequencyScaled, getScaleTransitionState } from './spectrogram-axis-renderer.js';
-import { handleSpectrogramSelection, isInFrequencySelectionMode, getCurrentRegions, startFrequencySelection } from './region-tracker.js';
+import { handleSpectrogramSelection, isInFrequencySelectionMode, getCurrentRegions, startFrequencySelection, zoomToRegion } from './region-tracker.js';
 import { renderCompleteSpectrogram, clearCompleteSpectrogram, isCompleteSpectrogramRendered, renderCompleteSpectrogramForRegion, updateSpectrogramViewport, getSpectrogramViewport, resetSpectrogramState, getInfiniteCanvasStatus, updateElasticFriendInBackground } from './spectrogram-complete-renderer.js';
 import { zoomState } from './zoom-state.js';
 import { isStudyMode } from './master-modes.js';
 import { getInterpolatedTimeRange } from './waveform-x-axis-renderer.js';
 import { updateAllFeatureBoxPositions } from './spectrogram-feature-boxes.js';
 import { animateScaleTransition } from './spectrogram-axis-renderer.js';
-import { startPlaybackIndicator } from './waveform-renderer.js';
+import { startPlaybackIndicator, buildWaveformColorLUT, drawWaveformFromMinMax } from './waveform-renderer.js';
+import { setColormap, getCurrentColormap, updateAccentColors } from './colormaps.js';
 
 // Spectrogram selection state (pure canvas - separate overlay layer!)
 let spectrogramSelectionActive = false;
@@ -112,8 +113,8 @@ function getClickedBox(x, y) {
     // Check each box
     for (const box of completedSelectionBoxes) {
         // Convert box coordinates to device pixels (same logic as drawSavedBox)
-        const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
-        const originalNyquist = originalSampleRate / 2;
+        // 🔥 FIX: Use same source as drawSavedBox for consistent Y calculation
+        const originalNyquist = State.originalDataFrequencyRange?.max || 50;
         const playbackRate = State.currentPlaybackRate || 1.0;
         
         // Get Y positions
@@ -189,8 +190,7 @@ function rebuildCanvasBoxesFromFeatures() {
                     startTime: feature.startTime,
                     endTime: feature.endTime,
                     lowFreq: parseFloat(feature.lowFreq),
-                    highFreq: parseFloat(feature.highFreq),
-                    notes: feature.notes || '' // Add notes for annotations
+                    highFreq: parseFloat(feature.highFreq)
                 });
             }
         });
@@ -201,37 +201,13 @@ function rebuildCanvasBoxesFromFeatures() {
 }
 
 /**
- * Check if we're in results2025 mode (annotations should be shown)
- */
-function isResults2025Mode() {
-    const participantId = localStorage.getItem('participantId');
-    return participantId && participantId.toLowerCase() === 'results2025';
-}
-
-/**
  * Redraw canvas boxes (internal - clears and draws all boxes)
- * Uses two-pass rendering: boxes first, then annotations on top
  */
 function redrawCanvasBoxes() {
     if (spectrogramOverlayCtx && spectrogramOverlayCanvas) {
-        const canvas = document.getElementById('spectrogram');
-        if (!canvas) return;
-
         spectrogramOverlayCtx.clearRect(0, 0, spectrogramOverlayCanvas.width, spectrogramOverlayCanvas.height);
-
-        // PASS 1: Draw all feature boxes (no annotations yet)
         for (const savedBox of completedSelectionBoxes) {
             drawSavedBox(spectrogramOverlayCtx, savedBox);
-        }
-
-        // PASS 2: Draw annotations on top (only in results2025 mode)
-        if (isResults2025Mode()) {
-            const placedAnnotations = []; // Track placed annotations for collision detection
-            for (const savedBox of completedSelectionBoxes) {
-                if (savedBox.notes) {
-                    drawAnnotation(spectrogramOverlayCtx, canvas, savedBox, placedAnnotations, completedSelectionBoxes);
-                }
-            }
         }
     }
 }
@@ -372,7 +348,7 @@ export function loadFrequencyScale() {
     const select = document.getElementById('frequencyScale');
     if (!select) return;
     
-    // Load saved value from localStorage (default: 'sqrt')
+    // Load saved value from localStorage (default: 'logarithmic' for CDAWeb space physics data)
     const savedValue = localStorage.getItem('frequencyScale');
     if (savedValue !== null) {
         // Validate value is one of the allowed options
@@ -383,11 +359,154 @@ export function loadFrequencyScale() {
             console.log(`📊 Loaded saved frequency scale: ${savedValue}`);
         }
     } else {
-        // No saved value, use default and save it
-        const defaultValue = 'sqrt';
+        // No saved value, use default (logarithmic for space physics) and save it
+        const defaultValue = 'logarithmic';
         select.value = defaultValue;
         State.setFrequencyScale(defaultValue);
         localStorage.setItem('frequencyScale', defaultValue);
+    }
+}
+
+/**
+ * Load saved colormap from localStorage
+ */
+export function loadColormap() {
+    const select = document.getElementById('colormap');
+    if (!select) return;
+
+    const savedValue = localStorage.getItem('colormap');
+    if (savedValue) {
+        const validValues = ['solar', 'turbo', 'viridis', 'inferno', 'aurora', 'plasma', 'jet'];
+        if (validValues.includes(savedValue)) {
+            select.value = savedValue;
+            setColormap(savedValue);
+            updateAccentColors();
+            console.log(`🎨 Loaded saved colormap: ${savedValue}`);
+        }
+    } else {
+        // No saved value, use default (inferno) and save it
+        const defaultValue = 'inferno';
+        select.value = defaultValue;
+        setColormap(defaultValue);
+        updateAccentColors();
+        localStorage.setItem('colormap', defaultValue);
+    }
+}
+
+/**
+ * Change colormap and re-render spectrogram
+ */
+export async function changeColormap() {
+    const select = document.getElementById('colormap');
+    const value = select.value;
+
+    // If already on this colormap, don't process again
+    if (getCurrentColormap() === value) {
+        console.log(`🎨 Already using ${value} colormap - skipping change`);
+        return;
+    }
+
+    // Save to localStorage for persistence
+    localStorage.setItem('colormap', value);
+
+    // Update the colormap (rebuilds spectrogram LUT)
+    setColormap(value);
+
+    // Update UI accent colors to match colormap
+    updateAccentColors();
+
+    // Also rebuild the waveform color LUT (brighter version of colormap)
+    buildWaveformColorLUT();
+
+    // Redraw waveform with new colors
+    drawWaveformFromMinMax();
+
+    // Blur dropdown so spacebar can toggle play/pause
+    select.blur();
+
+    if (!isStudyMode()) {
+        console.log(`🎨 Colormap changed to: ${value}`);
+    }
+
+    // Re-render the spectrogram if one is already rendered
+    if (isCompleteSpectrogramRendered()) {
+        // Clear cached spectrogram and re-render with new colormap
+        clearCompleteSpectrogram();
+        await renderCompleteSpectrogram();
+    }
+}
+
+/**
+ * Change FFT size for spectrogram rendering
+ * Lower values = better time resolution, worse frequency resolution
+ * Higher values = better frequency resolution, worse time resolution
+ */
+export async function changeFftSize() {
+    const select = document.getElementById('fftSize');
+    const value = parseInt(select.value, 10);
+
+    // If already using this FFT size, don't process again
+    if (State.fftSize === value) {
+        console.log(`📐 Already using FFT size ${value} - skipping change`);
+        return;
+    }
+
+    // Save to localStorage for persistence
+    localStorage.setItem('fftSize', value.toString());
+
+    // Update state
+    State.setFftSize(value);
+
+    // Blur dropdown so spacebar can toggle play/pause
+    select.blur();
+
+    console.log(`📐 FFT size changed to: ${value}`);
+
+    // Re-render the spectrogram if one is already rendered
+    if (isCompleteSpectrogramRendered()) {
+        // Check if we're zoomed into a region
+        if (zoomState.isInitialized() && zoomState.isInRegion()) {
+            // Zoomed in: re-render both the region view AND the elastic friend
+            const regionRange = zoomState.getRegionRange();
+            console.log(`📐 Zoomed into region - re-rendering region view + elastic friend`);
+
+            // Convert Date objects to seconds
+            const dataStartMs = State.dataStartTime ? State.dataStartTime.getTime() : 0;
+            const startSeconds = (regionRange.startTime.getTime() - dataStartMs) / 1000;
+            const endSeconds = (regionRange.endTime.getTime() - dataStartMs) / 1000;
+
+            // Clear and re-render the region view
+            resetSpectrogramState();
+            await renderCompleteSpectrogramForRegion(startSeconds, endSeconds, false);
+
+            // Update the elastic friend in background (for zoom-out)
+            console.log(`🏠 Starting background render of full spectrogram for elastic friend...`);
+            updateElasticFriendInBackground();
+        } else {
+            // Full view: clear and re-render
+            clearCompleteSpectrogram();
+            await renderCompleteSpectrogram();
+        }
+    }
+}
+
+/**
+ * Load saved FFT size from localStorage on page load
+ */
+export function loadFftSize() {
+    const saved = localStorage.getItem('fftSize');
+    if (saved) {
+        const value = parseInt(saved, 10);
+        // Validate the saved value is a valid option
+        const validSizes = [512, 1024, 2048, 4096, 8192];
+        if (validSizes.includes(value)) {
+            State.setFftSize(value);
+            const select = document.getElementById('fftSize');
+            if (select) {
+                select.value = value.toString();
+            }
+            console.log(`📐 Loaded saved FFT size: ${value}`);
+        }
     }
 }
 
@@ -521,6 +640,9 @@ export async function changeFrequencyScale() {
                         startPlaybackIndicator();
                     }
                     if (!isStudyMode()) console.log('✅ Region scale transition complete (no fade)');
+                    // 🏠 PROACTIVE FIX: Re-render full spectrogram in background
+                    if (!isStudyMode()) console.log('🏠 Starting background render of full spectrogram for elastic friend...');
+                    updateElasticFriendInBackground();
                     return;
                 }
 
@@ -540,7 +662,7 @@ export async function changeFrequencyScale() {
                     console.warn('⚠️ getSpectrogramViewport returned canvas with no visible content (all black)');
                 }
 
-                if (!isStudyMode()) console.log('✅ Got new spectrogram viewport - starting crossfade');
+                console.log('✅ Got new spectrogram viewport - starting crossfade');
                 
                 // 🎨 Crossfade old → new (300ms)
                 const fadeDuration = 300;
@@ -606,7 +728,7 @@ export async function changeFrequencyScale() {
 
                         // 🏠 PROACTIVE FIX: Re-render full spectrogram in background
                         // So elastic friend is ready with new frequency scale when user zooms out
-                        console.log('🏠 Starting background render of full spectrogram for elastic friend...');
+                        if (!isStudyMode()) console.log('🏠 Starting background render of full spectrogram for elastic friend...');
                         updateElasticFriendInBackground();
                     }
                 };
@@ -738,77 +860,6 @@ export async function changeFrequencyScale() {
         // Update feature box positions for new frequency scale (even if no spectrogram yet)
         updateAllFeatureBoxPositions();
         redrawAllCanvasFeatureBoxes(); // Update canvas boxes too!
-    }
-}
-
-/**
- * Handle minimum frequency change from UI input
- * Re-renders spectrogram and axis when the log scale minimum is adjusted
- */
-export async function changeMinFrequency() {
-    const input = document.getElementById('minFrequencyInput');
-    if (!input) return;
-
-    const value = parseFloat(input.value);
-
-    // Validate input
-    if (isNaN(value) || value <= 0) {
-        console.warn('⚠️ Invalid min frequency value:', value);
-        input.value = State.MIN_FREQUENCY_HZ; // Reset to current value
-        return;
-    }
-
-    // If already at this value, don't process again
-    if (State.MIN_FREQUENCY_HZ === value) {
-        console.log(`📊 Already at min frequency ${value} Hz - skipping change`);
-        return;
-    }
-
-    console.log(`📊 Min frequency changed from ${State.MIN_FREQUENCY_HZ} Hz to ${value} Hz`);
-
-    // Update state
-    State.setMinFrequencyHz(value);
-
-    // Save to localStorage for persistence
-    localStorage.setItem('minFrequencyHz', value.toString());
-
-    // If in logarithmic scale and spectrogram is rendered, re-render
-    if (State.frequencyScale === 'logarithmic' && isCompleteSpectrogramRendered()) {
-        console.log('🎨 Re-rendering spectrogram and axis for new min frequency...');
-
-        // Re-render axis with new minimum
-        positionAxisCanvas();
-        initializeAxisPlaybackRate();
-        drawFrequencyAxis();
-
-        // Re-render spectrogram
-        if (zoomState.isInitialized() && zoomState.isInRegion()) {
-            // In region - re-render region
-            const regionRange = zoomState.getRegionRange();
-            const dataStartMs = State.dataStartTime ? State.dataStartTime.getTime() : 0;
-            const startSeconds = (regionRange.startTime.getTime() - dataStartMs) / 1000;
-            const endSeconds = (regionRange.endTime.getTime() - dataStartMs) / 1000;
-
-            resetSpectrogramState();
-            await renderCompleteSpectrogramForRegion(startSeconds, endSeconds);
-        } else {
-            // Full view - re-render complete
-            resetSpectrogramState();
-            await renderCompleteSpectrogram();
-        }
-
-        // Update feature box positions
-        updateAllFeatureBoxPositions();
-        redrawAllCanvasFeatureBoxes();
-
-        console.log('✅ Spectrogram and axis re-rendered with new min frequency');
-    } else {
-        // Not in log scale or no spectrogram - just update axis
-        positionAxisCanvas();
-        initializeAxisPlaybackRate();
-        drawFrequencyAxis();
-
-        console.log('✅ Axis updated with new min frequency');
     }
 }
 
@@ -990,14 +1041,12 @@ export function setupSpectrogramSelection() {
 
     canvas.addEventListener('mousedown', (e) => {
         // 🔍 DEBUG: Log zoom state when clicking on canvas
-        if (!isStudyMode()) {
-            console.log('🖱️ [MOUSEDOWN] Canvas clicked - checking zoom state:', {
-                zoomStateInitialized: zoomState.isInitialized(),
-                isInRegion: zoomState.isInitialized() ? zoomState.isInRegion() : 'N/A (not initialized)',
-                zoomMode: zoomState.isInitialized() ? zoomState.mode : 'N/A',
-                activeRegionId: zoomState.isInitialized() ? zoomState.activeRegionId : 'N/A'
-            });
-        }
+        console.log('🖱️ [MOUSEDOWN] Canvas clicked - checking zoom state:', {
+            zoomStateInitialized: zoomState.isInitialized(),
+            isInRegion: zoomState.isInitialized() ? zoomState.isInRegion() : 'N/A (not initialized)',
+            zoomMode: zoomState.isInitialized() ? zoomState.mode : 'N/A',
+            activeRegionId: zoomState.isInitialized() ? zoomState.activeRegionId : 'N/A'
+        });
         
         // 🎯 Check if region creation is enabled (requires "Begin Analysis" to be pressed)
         if (!State.isRegionCreationEnabled()) {
@@ -1012,11 +1061,31 @@ export function setupSpectrogramSelection() {
             return; // Don't allow spectrogram selection
         }
         
+        // ✅ Check if clicking on an existing canvas box FIRST (before zoom check)
+        // This allows clicking features to zoom in when zoomed out
+        const canvasRect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - canvasRect.left;
+        const clickY = e.clientY - canvasRect.top;
+
+        const clickedBox = getClickedBox(clickX, clickY);
+        if (clickedBox && !spectrogramSelectionActive) {
+            // Check if we're zoomed out - if so, zoom to the region
+            if (!zoomState.isInRegion()) {
+                console.log(`🔍 Clicked feature box while zoomed out - zooming to region ${clickedBox.regionIndex + 1}`);
+                zoomToRegion(clickedBox.regionIndex);
+                return;
+            }
+            // Zoomed in - start frequency selection to re-draw the feature
+            startFrequencySelection(clickedBox.regionIndex, clickedBox.featureIndex);
+            console.log(`🎯 Clicked canvas box - starting reselection for region ${clickedBox.regionIndex + 1}, feature ${clickedBox.featureIndex + 1}`);
+            return; // Don't start new selection
+        }
+
         // 🎯 NEW ARCHITECTURE: Allow drawing when zoomed into a region (no 'f' key needed!)
         // If not zoomed in, don't handle - user is looking at full view
         if (!zoomState.isInRegion()) {
             console.log('🖱️ [MOUSEDOWN] Not in region - returning early (zoom state says not zoomed in)');
-            
+
             // Show helpful message - user needs to create a region first (only if not in tutorial)
             import('./tutorial-state.js').then(({ isTutorialActive }) => {
                 if (!isTutorialActive()) {
@@ -1025,21 +1094,8 @@ export function setupSpectrogramSelection() {
                     });
                 }
             });
-            
+
             return;
-        }
-        
-        // ✅ Check if clicking on an existing canvas box (click to re-draw feature)
-        const canvasRect = canvas.getBoundingClientRect();
-        const clickX = e.clientX - canvasRect.left;
-        const clickY = e.clientY - canvasRect.top;
-        
-        const clickedBox = getClickedBox(clickX, clickY);
-        if (clickedBox && !spectrogramSelectionActive) {
-            // Clicked on a box - start frequency selection for that feature!
-            startFrequencySelection(clickedBox.regionIndex, clickedBox.featureIndex);
-            console.log(`🎯 Clicked canvas box - starting reselection for region ${clickedBox.regionIndex + 1}, feature ${clickedBox.featureIndex + 1}`);
-            return; // Don't start new selection
         }
 
         // 🔥 FIX: ALWAYS force-reset state before starting new selection
@@ -1188,6 +1244,20 @@ export function setupSpectrogramSelection() {
     });
     
     canvas.addEventListener('mousemove', (e) => {
+        // 👆 Cursor change: pointer when hovering feature boxes (when zoomed out)
+        const canvasRect = canvas.getBoundingClientRect();
+        const hoverX = e.clientX - canvasRect.left;
+        const hoverY = e.clientY - canvasRect.top;
+        const hoveredBox = getClickedBox(hoverX, hoverY);
+
+        if (hoveredBox && !zoomState.isInRegion() && !spectrogramSelectionActive) {
+            canvas.style.cursor = 'pointer';
+        } else if (zoomState.isInRegion() && !spectrogramSelectionActive) {
+            canvas.style.cursor = 'crosshair';
+        } else if (!spectrogramSelectionActive) {
+            canvas.style.cursor = 'default';
+        }
+
         // 🔥 STUCK STATE DETECTION: If selection is active but overlay context is missing, we're stuck!
         if (spectrogramSelectionActive && !spectrogramOverlayCtx) {
             console.error('⚠️ [STUCK STATE DETECTED] Selection active but overlay context missing in mousemove!');
@@ -1202,8 +1272,8 @@ export function setupSpectrogramSelection() {
         }
         
         if (!spectrogramSelectionActive || !spectrogramOverlayCtx) return;
-        
-        const canvasRect = canvas.getBoundingClientRect();
+
+        // Reuse canvasRect from above (already declared at line 1248)
         const currentX = e.clientX - canvasRect.left;
         const currentY = e.clientY - canvasRect.top;
         
@@ -1367,7 +1437,7 @@ export function cancelSpectrogramSelection() {
         for (const box of completedSelectionBoxes) {
             drawSavedBox(spectrogramOverlayCtx, box);
         }
-        if (!isStudyMode()) console.log(`🧹 Canceled current drag, kept ${completedSelectionBoxes.length} completed boxes`);
+        console.log(`🧹 Canceled current drag, kept ${completedSelectionBoxes.length} completed boxes`);
     }
     
     // DEPRECATED: Legacy DOM box cleanup (kept for transition period)
@@ -1375,317 +1445,6 @@ export function cancelSpectrogramSelection() {
         spectrogramSelectionBox.remove();
         spectrogramSelectionBox = null;
     }
-}
-
-/**
- * Wrap text to fit within maxWidth
- * CRITICAL: ctx.font MUST be set before calling this function
- */
-function wrapText(ctx, text, maxWidth) {
-    if (!text) return [];
-
-    const words = text.split(' ');
-    const lines = [];
-    let currentLine = '';
-
-    for (let i = 0; i < words.length; i++) {
-        const testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
-        const metrics = ctx.measureText(testLine);
-
-        if (metrics.width > maxWidth && currentLine) {
-            lines.push(currentLine);
-            currentLine = words[i];
-        } else {
-            currentLine = testLine;
-        }
-    }
-
-    if (currentLine) {
-        lines.push(currentLine);
-    }
-
-    return lines.length > 0 ? lines : [text];
-}
-
-/**
- * Draw annotation text above a feature box with collision detection
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {HTMLCanvasElement} canvas - Canvas element
- * @param {Object} box - Feature box data (the box we're annotating)
- * @param {Array} placedAnnotations - Array tracking already placed annotations for collision detection
- * @param {Array} allBoxes - All feature boxes to check for collisions
- */
-function drawAnnotation(ctx, canvas, box, placedAnnotations, allBoxes) {
-    // Only draw annotations if box has notes
-    if (!box.notes || box.notes.trim() === '') {
-        return;
-    }
-
-    // Need zoom state and data times
-    if (!State.dataStartTime || !State.dataEndTime || !zoomState.isInitialized()) {
-        return;
-    }
-
-    // Calculate box position (same logic as drawSavedBox)
-    const lowFreq = box.lowFreq;
-    const highFreq = box.highFreq;
-
-    const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
-    const originalNyquist = originalSampleRate / 2;
-    const playbackRate = State.currentPlaybackRate || 1.0;
-
-    const scaleTransition = getScaleTransitionState();
-
-    let lowFreqY_device, highFreqY_device;
-
-    if (scaleTransition.inProgress && scaleTransition.oldScaleType) {
-        const oldLowY = getYPositionForFrequencyScaled(lowFreq, originalNyquist, canvas.height, scaleTransition.oldScaleType, playbackRate);
-        const newLowY = getYPositionForFrequencyScaled(lowFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
-        const oldHighY = getYPositionForFrequencyScaled(highFreq, originalNyquist, canvas.height, scaleTransition.oldScaleType, playbackRate);
-        const newHighY = getYPositionForFrequencyScaled(highFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
-
-        lowFreqY_device = oldLowY + (newLowY - oldLowY) * scaleTransition.interpolationFactor;
-        highFreqY_device = oldHighY + (newHighY - oldHighY) * scaleTransition.interpolationFactor;
-    } else {
-        lowFreqY_device = getYPositionForFrequencyScaled(lowFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
-        highFreqY_device = getYPositionForFrequencyScaled(highFreq, originalNyquist, canvas.height, State.frequencyScale, playbackRate);
-    }
-
-    const startTimestamp = new Date(box.startTime);
-    const endTimestamp = new Date(box.endTime);
-
-    // Use EXACT same interpolated time range as spectrogram elastic stretching!
-    const interpolatedRange = getInterpolatedTimeRange();
-    const displayStartMs = interpolatedRange.startTime.getTime();
-    const displayEndMs = interpolatedRange.endTime.getTime();
-    const displaySpanMs = displayEndMs - displayStartMs;
-
-    const startMs = startTimestamp.getTime();
-    const endMs = endTimestamp.getTime();
-
-    const startProgress = (startMs - displayStartMs) / displaySpanMs;
-    const endProgress = (endMs - displayStartMs) / displaySpanMs;
-
-    const startX_device = startProgress * canvas.width;
-    const endX_device = endProgress * canvas.width;
-
-    // Check if box is off-screen
-    if (endX_device < 0 || startX_device > canvas.width) {
-        return;
-    }
-
-    const topY = Math.min(highFreqY_device, lowFreqY_device);
-    const bottomY = Math.max(highFreqY_device, lowFreqY_device);
-    if (bottomY < 0 || topY > canvas.height) {
-        return;
-    }
-
-    const boxX = Math.min(startX_device, endX_device);
-    const boxY = Math.min(highFreqY_device, lowFreqY_device);
-    const boxWidth = Math.abs(endX_device - startX_device);
-    const boxHeight = Math.abs(lowFreqY_device - highFreqY_device);
-
-    // Text positioning
-    ctx.save();
-    ctx.font = '600 13px Arial, sans-serif';
-
-    const maxWidth = 325; // Device pixels
-    const lines = wrapText(ctx, box.notes, maxWidth);
-    const lineHeight = 16; // Device pixels
-    const totalTextHeight = lines.length * lineHeight;
-
-    // Measure actual text width
-    const textWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
-    const halfWidth = textWidth / 2;
-
-    const padding = 10;
-    const sideOffset = 30;
-
-    // Helper function to check if text rect collides with anything
-    const checkCollision = (textCenterX, textCenterY) => {
-        const textLeft = textCenterX - halfWidth - padding;
-        const textRight = textCenterX + halfWidth + padding;
-        const textTop = textCenterY - totalTextHeight / 2 - padding;
-        const textBottom = textCenterY + totalTextHeight / 2 + padding;
-
-        // Check collision with all feature boxes (except the one we're annotating)
-        for (const otherBox of allBoxes) {
-            if (otherBox === box) continue; // Skip the box we're annotating
-
-            // Calculate other box position (same logic as above)
-            const otherOriginalSampleRate = State.currentMetadata?.original_sample_rate || 100;
-            const otherOriginalNyquist = otherOriginalSampleRate / 2;
-            const otherPlaybackRate = State.currentPlaybackRate || 1.0;
-            const otherScaleTransition = getScaleTransitionState();
-
-            let otherLowFreqY, otherHighFreqY;
-            if (otherScaleTransition.inProgress && otherScaleTransition.oldScaleType) {
-                const oldLowY = getYPositionForFrequencyScaled(otherBox.lowFreq, otherOriginalNyquist, canvas.height, otherScaleTransition.oldScaleType, otherPlaybackRate);
-                const newLowY = getYPositionForFrequencyScaled(otherBox.lowFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
-                const oldHighY = getYPositionForFrequencyScaled(otherBox.highFreq, otherOriginalNyquist, canvas.height, otherScaleTransition.oldScaleType, otherPlaybackRate);
-                const newHighY = getYPositionForFrequencyScaled(otherBox.highFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
-                otherLowFreqY = oldLowY + (newLowY - oldLowY) * otherScaleTransition.interpolationFactor;
-                otherHighFreqY = oldHighY + (newHighY - oldHighY) * otherScaleTransition.interpolationFactor;
-            } else {
-                otherLowFreqY = getYPositionForFrequencyScaled(otherBox.lowFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
-                otherHighFreqY = getYPositionForFrequencyScaled(otherBox.highFreq, otherOriginalNyquist, canvas.height, State.frequencyScale, otherPlaybackRate);
-            }
-
-            const otherStartTimestamp = new Date(otherBox.startTime);
-            const otherEndTimestamp = new Date(otherBox.endTime);
-            const otherInterpolatedRange = getInterpolatedTimeRange();
-            const otherDisplayStartMs = otherInterpolatedRange.startTime.getTime();
-            const otherDisplayEndMs = otherInterpolatedRange.endTime.getTime();
-            const otherDisplaySpanMs = otherDisplayEndMs - otherDisplayStartMs;
-            const otherStartMs = otherStartTimestamp.getTime();
-            const otherEndMs = otherEndTimestamp.getTime();
-            const otherStartProgress = (otherStartMs - otherDisplayStartMs) / otherDisplaySpanMs;
-            const otherEndProgress = (otherEndMs - otherDisplayStartMs) / otherDisplaySpanMs;
-            const otherStartX = otherStartProgress * canvas.width;
-            const otherEndX = otherEndProgress * canvas.width;
-
-            const otherBoxX = Math.min(otherStartX, otherEndX);
-            const otherBoxY = Math.min(otherHighFreqY, otherLowFreqY);
-            const otherBoxWidth = Math.abs(otherEndX - otherStartX);
-            const otherBoxHeight = Math.abs(otherLowFreqY - otherHighFreqY);
-
-            // Check rectangle overlap
-            if (!(textRight < otherBoxX || textLeft > otherBoxX + otherBoxWidth ||
-                  textBottom < otherBoxY || textTop > otherBoxY + otherBoxHeight)) {
-                return true; // Collision!
-            }
-        }
-
-        // Check collision with already placed annotations
-        for (const placed of placedAnnotations) {
-            const placedLeft = placed.x - placed.halfWidth - padding;
-            const placedRight = placed.x + placed.halfWidth + padding;
-            const placedTop = placed.y - placed.height / 2 - padding;
-            const placedBottom = placed.y + placed.height / 2 + padding;
-
-            if (!(textRight < placedLeft || textLeft > placedRight ||
-                  textBottom < placedTop || textTop > placedBottom)) {
-                return true; // Collision!
-            }
-        }
-
-        return false; // No collision
-    };
-
-    // Try positions in order: above → below → left → right
-    let finalTextX, finalTextY;
-    let drawToSide = null;
-
-    // Position 1: Above (default)
-    let aboveX = boxX + (boxWidth / 2);
-    let aboveY = boxY - 20 - totalTextHeight / 2;
-
-    if (aboveY - totalTextHeight / 2 >= 10 && !checkCollision(aboveX, aboveY)) {
-        // Above works!
-        finalTextX = aboveX;
-        finalTextY = aboveY;
-    } else {
-        // Position 2: Below
-        let belowX = boxX + (boxWidth / 2);
-        let belowY = boxY + boxHeight + 20 + totalTextHeight / 2;
-
-        if (belowY + totalTextHeight / 2 <= canvas.height - 10 && !checkCollision(belowX, belowY)) {
-            // Below works!
-            finalTextX = belowX;
-            finalTextY = belowY;
-        } else {
-            // Position 3: Left
-            let leftX = boxX - halfWidth - sideOffset;
-            let leftY = boxY + (boxHeight / 2);
-
-            if (leftX - halfWidth >= 10 && !checkCollision(leftX, leftY)) {
-                // Left works!
-                finalTextX = leftX;
-                finalTextY = leftY;
-                drawToSide = 'left';
-            } else {
-                // Position 4: Right (fallback)
-                let rightX = boxX + boxWidth + halfWidth + sideOffset;
-                let rightY = boxY + (boxHeight / 2);
-                finalTextX = rightX;
-                finalTextY = rightY;
-                drawToSide = 'right';
-            }
-        }
-    }
-
-    // Edge detection - keep text on-screen horizontally
-    if (finalTextX - halfWidth < 10) {
-        finalTextX = 10 + halfWidth;
-    }
-    if (finalTextX + halfWidth > canvas.width - 10) {
-        finalTextX = canvas.width - 10 - halfWidth;
-    }
-
-    // Bottom guard - clamp to canvas if it would go off the bottom
-    if (finalTextY + totalTextHeight > canvas.height - 10) {
-        finalTextY = canvas.height - 10 - totalTextHeight;
-    }
-
-    // Top guard (final check after collision detection)
-    if (finalTextY < 10) {
-        finalTextY = 10;
-    }
-
-    // Record this annotation's position for future collision checks
-    placedAnnotations.push({
-        x: finalTextX,
-        y: finalTextY,
-        halfWidth: halfWidth,
-        height: totalTextHeight
-    });
-
-    // Draw connecting line
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([3, 3]);
-
-    ctx.beginPath();
-    if (drawToSide === 'left') {
-        // Line from right side of text to left side of box
-        ctx.moveTo(finalTextX + halfWidth, finalTextY + totalTextHeight / 2);
-        ctx.lineTo(boxX, boxY + boxHeight / 2);
-    } else if (drawToSide === 'right') {
-        // Line from left side of text to right side of box
-        ctx.moveTo(finalTextX - halfWidth, finalTextY + totalTextHeight / 2);
-        ctx.lineTo(boxX + boxWidth, boxY + boxHeight / 2);
-    } else {
-        // Determine if annotation is above or below the box
-        const annotationIsBelow = finalTextY > boxY + boxHeight;
-        if (annotationIsBelow) {
-            // Line from top of text to bottom of box
-            ctx.moveTo(finalTextX, finalTextY);
-            ctx.lineTo(boxX + boxWidth / 2, boxY + boxHeight);
-        } else {
-            // Line from bottom of text to top of box
-            ctx.moveTo(finalTextX, finalTextY + totalTextHeight);
-            ctx.lineTo(boxX + boxWidth / 2, boxY);
-        }
-    }
-    ctx.stroke();
-
-    ctx.setLineDash([]); // Reset dash pattern
-
-    // Draw text with shadow for readability
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-        const lineY = finalTextY + (i * lineHeight);
-        ctx.fillText(lines[i], finalTextX, lineY);
-    }
-
-    ctx.restore();
 }
 
 /**
@@ -1705,10 +1464,8 @@ function drawSavedBox(ctx, box) {
     const lowFreq = box.lowFreq;
     const highFreq = box.highFreq;
     
-    // Get original sample rate from metadata (same as orange boxes!)
-    // NOT hardcoded - comes from State.currentMetadata.original_sample_rate
-    const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
-    const originalNyquist = originalSampleRate / 2; // Calculated from metadata, not assumed!
+    // Use same source as Y-axis for consistency
+    const originalNyquist = State.originalDataFrequencyRange?.max || 50;
     
     // Get current playback rate (CRITICAL for stretching!)
     const playbackRate = State.currentPlaybackRate || 1.0;
@@ -1737,7 +1494,7 @@ function drawSavedBox(ctx, box) {
     // Convert times to X positions (DEVICE PIXELS) - EXACT COPY of orange box logic!
     const startTimestamp = new Date(box.startTime);
     const endTimestamp = new Date(box.endTime);
-
+    
     // Use EXACT same interpolated time range as spectrogram elastic stretching!
     const interpolatedRange = getInterpolatedTimeRange();
     const displayStartMs = interpolatedRange.startTime.getTime();
@@ -1781,7 +1538,8 @@ function drawSavedBox(ctx, box) {
     ctx.fillRect(x, y, width, height);
     
     // Add feature number label in upper left corner (like orange boxes!)
-    const numberText = (box.featureIndex + 1).toString(); // 1-indexed for display
+    // Format: region.feature (e.g., 1.1, 1.2, 2.1)
+    const numberText = `${box.regionIndex + 1}.${box.featureIndex + 1}`;
     ctx.font = '16px Arial, sans-serif'; // Removed bold for flatter look
     ctx.fillStyle = 'rgba(255, 160, 80, 0.9)'; // Slightly more opaque, less 3D
     ctx.textAlign = 'left';

@@ -1949,12 +1949,12 @@ function removeModalEventListeners() {
     modalListenersSetup = false;
 }
 
-export function openParticipantModal() {
+export async function openParticipantModal() {
     console.log('🔍 openParticipantModal() called');
-    
+
     // Close all other modals first
     closeAllModals();
-    
+
     const modal = document.getElementById('participantModal');
     if (!modal) {
         console.error('❌ CRITICAL: Participant modal not found in DOM!');
@@ -1962,7 +1962,11 @@ export function openParticipantModal() {
         // Don't fade in overlay if modal doesn't exist
         return;
     }
-    
+
+    // Check if in showcase mode
+    const { isShowcaseMode } = await import('./master-modes.js');
+    const inShowcaseMode = isShowcaseMode();
+
     // Get participant ID from URL (takes precedence) or localStorage
     const participantId = getParticipantId();
     const urlId = getParticipantIdFromURL(); // Check if ID came from Qualtrics URL
@@ -1970,13 +1974,35 @@ export function openParticipantModal() {
     const participantSubmitBtn = document.querySelector('#participantModal .modal-submit');
     const modalTitle = modal.querySelector('.modal-title');
     const instructionText = modal.querySelector('.modal-body p');
-    
+    const emailText = modal.querySelector('.modal-body p:last-child'); // The "Not look right?" text
+
     // Determine context: initial setup vs upper right corner click
     const hasExistingId = participantId && participantId.trim().length > 0;
     const idFromQualtrics = urlId && urlId.trim().length > 0;
-    
-    // Dynamically update modal text based on context
-    if (hasExistingId && !idFromQualtrics) {
+
+    // ✨ SHOWCASE MODE: Custom text and hide email
+    if (inShowcaseMode) {
+        if (modalTitle) {
+            modalTitle.textContent = "🌋 Welcome";
+        }
+        if (instructionText) {
+            if (hasExistingId) {
+                instructionText.textContent = "Your user name is stored.";
+                instructionText.style.fontWeight = 'normal';
+            } else {
+                instructionText.textContent = "Enter a user name to begin:";
+                instructionText.style.fontWeight = 'bold';
+            }
+        }
+        if (emailText && emailText.textContent.includes('Not look right')) {
+            emailText.style.display = 'none'; // Hide email text in showcase mode
+        }
+        if (participantIdInput) {
+            participantIdInput.placeholder = "Enter your name";
+        }
+    }
+    // STUDY MODE: Standard text
+    else if (hasExistingId && !idFromQualtrics) {
         // User clicked from upper right corner - ID exists in localStorage
         if (modalTitle) {
             modalTitle.textContent = "Welcome!";
@@ -2676,7 +2702,7 @@ export function closeMissingStudyIdModal(keepOverlay = null) {
     console.log(`⚠️ Missing Study ID modal closed (keepOverlay: ${keepOverlay})`);
 }
 
-export function submitParticipantSetup() {
+export async function submitParticipantSetup() {
     const participantId = document.getElementById('participantId').value.trim();
 
     // Save to localStorage for persistence across sessions
@@ -2695,15 +2721,25 @@ export function submitParticipantSetup() {
 
     const statusEl = document.getElementById('status');
     statusEl.className = 'status success';
-    statusEl.textContent = `✅ ID recorded`;
+    statusEl.textContent = `✅ User name saved`;
 
     // Update participant ID display in top panel
     // Always show the display (even if no ID set) so users can click to enter their ID
     const displayElement = document.getElementById('participantIdDisplay');
     const valueElement = document.getElementById('participantIdValue');
+    const textElement = document.getElementById('participantIdText');
+
+    // Update label based on mode
+    const { isShowcaseMode } = await import('./master-modes.js');
+    if (textElement && isShowcaseMode()) {
+        // In SHOWCASE mode, show "User Name:" instead of "Participant ID:"
+        textElement.innerHTML = `User Name: <span id="participantIdValue" style="font-weight: 600; color: #bbb;">${participantId || '--'}</span>`;
+    } else if (valueElement) {
+        // In other modes, just update the value
+        valueElement.textContent = participantId || '--';
+    }
 
     if (displayElement) displayElement.style.display = 'block';
-    if (valueElement) valueElement.textContent = participantId || '--';
 
     // 🔍 Check if username is "results2025" - show results panel
     if (participantId && participantId.toLowerCase() === 'results2025') {
@@ -2712,6 +2748,14 @@ export function submitParticipantSetup() {
     } else {
         // Hide results panel if it exists and user is not "results2025"
         hideResultsPanel();
+
+        // Re-enable fetch button when switching from results2025 to standard user
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.title = '';
+            console.log('🔓 Fetch button re-enabled after switching from results2025 user');
+        }
     }
 
     // 🔥 REMOVED: Don't manually hide modal or fade overlay

@@ -11,6 +11,24 @@ export const PlaybackState = {
     PAUSED: 'PAUSED'     // Paused (ready to resume)
 };
 
+// Frequency scale constants
+// Minimum frequency for logarithmic scale display (avoids log(0))
+// Used in: region-tracker.js, spectrogram-complete-renderer.js, spectrogram-axis-renderer.js
+// Change this value via setMinFrequencyHz() to update the lower bound of log frequency display everywhere
+// Per-volcano defaults are configured when volcano changes
+export let MIN_FREQUENCY_HZ = 0.01;
+
+// Per-volcano minimum frequency configuration
+// NOTE: Use lowercase internal names (e.g., 'maunaloa', 'greatsitkin') not display names
+export const VOLCANO_MIN_FREQUENCY = {
+    'greatsitkin': 0.04,
+    'kilauea': 0.08,
+    'maunaloa': 0.088,
+    'shishaldin': 0.04,
+    'spurr': 0.037,
+    'default': 0.01  // Default for all other volcanoes
+};
+
 // Audio nodes
 export let audioContext = null;
 export let workletNode = null;
@@ -167,6 +185,10 @@ export function setVisualizationStarted(value) { visualizationStarted = value; }
 export function setIsShowingFinalWaveform(value) { isShowingFinalWaveform = value; }
 export function setJustSeeked(value) { justSeeked = value; }
 export function setFrequencyScale(value) { frequencyScale = value; }
+export function setMinFrequencyHz(value) { MIN_FREQUENCY_HZ = value; }
+export function getMinFrequencyForVolcano(volcanoName) {
+    return VOLCANO_MIN_FREQUENCY[volcanoName] || VOLCANO_MIN_FREQUENCY['default'];
+}
 export function setVolcanoWithData(value) { volcanoWithData = value; }
 export function setPlaybackIndicatorRAF(value) { playbackIndicatorRAF = value; }
 export function setSpectrogramRAF(value) { spectrogramRAF = value; }

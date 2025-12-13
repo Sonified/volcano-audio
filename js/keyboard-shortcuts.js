@@ -132,7 +132,13 @@ function handleKeyboardShortcut(event) {
     }
     
     // Frequency scale shortcuts: 'c' for linear, 'v' for square root, 'b' for logarithmic
+    // Only trigger if no modifier keys are pressed (allow Cmd+C, Cmd+V for copy/paste)
     if (event.key === 'c' || event.key === 'C') {
+        // If any modifier key is pressed, let browser handle it (e.g., Cmd+C for copy)
+        if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+            return;
+        }
+
         event.preventDefault();
         const select = document.getElementById('frequencyScale');
         if (select && State.frequencyScale !== 'linear') {
@@ -140,7 +146,7 @@ function handleKeyboardShortcut(event) {
             changeFrequencyScale();
             console.log('📊 Frequency scale changed to: Linear');
         }
-        
+
         // 🎓 Tutorial: Track keyboard shortcut presses
         if (State.waitingForFrequencyScaleKeys) {
             State.setFrequencyScaleKeyPressCount(State.frequencyScaleKeyPressCount + 1);
@@ -154,8 +160,13 @@ function handleKeyboardShortcut(event) {
         }
         return;
     }
-    
+
     if (event.key === 'v' || event.key === 'V') {
+        // If any modifier key is pressed, let browser handle it (e.g., Cmd+V for paste)
+        if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+            return;
+        }
+
         event.preventDefault();
         const select = document.getElementById('frequencyScale');
         if (select && State.frequencyScale !== 'sqrt') {
@@ -163,7 +174,7 @@ function handleKeyboardShortcut(event) {
             changeFrequencyScale();
             console.log('📊 Frequency scale changed to: Square Root');
         }
-        
+
         // 🎓 Tutorial: Track keyboard shortcut presses
         if (State.waitingForFrequencyScaleKeys) {
             State.setFrequencyScaleKeyPressCount(State.frequencyScaleKeyPressCount + 1);
@@ -177,8 +188,13 @@ function handleKeyboardShortcut(event) {
         }
         return;
     }
-    
+
     if (event.key === 'b' || event.key === 'B') {
+        // If any modifier key is pressed, let browser handle it
+        if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+            return;
+        }
+
         event.preventDefault();
         const select = document.getElementById('frequencyScale');
         if (select && State.frequencyScale !== 'logarithmic') {
@@ -186,7 +202,7 @@ function handleKeyboardShortcut(event) {
             changeFrequencyScale();
             console.log('📊 Frequency scale changed to: Logarithmic');
         }
-        
+
         // 🎓 Tutorial: Track keyboard shortcut presses
         if (State.waitingForFrequencyScaleKeys) {
             State.setFrequencyScaleKeyPressCount(State.frequencyScaleKeyPressCount + 1);

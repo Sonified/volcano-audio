@@ -137,14 +137,14 @@ export function drawFrequencyAxis() {
         tickFrequencies.sort((a, b) => a - b);
     }
     
-    // Calculate bottom threshold: bottom 6% of canvas height
-    const bottomThreshold = canvasHeight * 0.94; // Hide labels in bottom 6%
+    // Calculate bottom threshold: bottom 3% of canvas height
+    const bottomThreshold = canvasHeight * 0.97; // Hide labels in bottom 3%
     
     // Draw each tick - show ALL ticks regardless of playback speed
     tickFrequencies.forEach(originalFreq => {
-        // Skip 0 Hz, 0.1 Hz (log scale), and max frequency
+        // Skip 0 Hz and max frequency
         // BUT: allow 50 Hz to show when speed < 0.95x (even if it's the Nyquist)
-        if (originalFreq === 0 || originalFreq === 0.1) return;
+        if (originalFreq === 0) return;
         if (originalFreq === originalNyquist && !(originalFreq === 50 && smoothedRate < 0.95)) return;
         
         // For square root scale at slower speeds, remove specific frequencies to reduce clutter
@@ -231,9 +231,9 @@ export function drawFrequencyAxis() {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
     // Position at bottom: with middle baseline, y position is center of text
-    // Move it down a bit lower than before
+    // Move it down close to the bottom edge
     const textHeight = 16; // Approximate height of 16px font
-    ctx.fillText('Hz', 8, canvasHeight - 2 - (textHeight / 2));  // Left aligned, positioned lower near bottom
+    ctx.fillText('Hz', 8, canvasHeight - (textHeight / 4));  // Left aligned, positioned very close to bottom
     
     // Continue animation if in progress
     if (scaleTransitionInProgress) {
@@ -266,7 +266,7 @@ function getYPositionForFrequency(freq, maxFreq, canvasHeight, scaleType) {
     
     if (scaleType === 'logarithmic') {
         // Logarithmic scale
-        const minFreq = 0.1; // Avoid log(0)
+        const minFreq = State.MIN_FREQUENCY_HZ; // Avoid log(0)
         const freqSafe = Math.max(freq, minFreq);
         const logMin = Math.log10(minFreq);
         const logMax = Math.log10(maxFreq);
@@ -288,18 +288,18 @@ function getYPositionForFrequency(freq, maxFreq, canvasHeight, scaleType) {
  * This is needed because log scale is NOT homogeneous - we must stretch positions, not scale frequencies
  */
 function calculateStretchFactorForLog(playbackRate, originalNyquist) {
-    const minFreq = 0.1; // Match tick positioning (avoid log(0))
+    const minFreq = State.MIN_FREQUENCY_HZ; // Use configured minimum (avoid log(0))
     const logMin = Math.log10(minFreq);
     const logMax = Math.log10(originalNyquist);
     const logRange = logMax - logMin;
-    
+
     // Adapted from spectrogram stretch factor: targetMaxFreq = originalNyquist / playbackRate
     // At higher playbackRate, we show a smaller portion (zooming in on lower frequencies)
     const targetMaxFreq = originalNyquist / playbackRate;
     const logTargetMax = Math.log10(Math.max(targetMaxFreq, minFreq));
     const targetLogRange = logTargetMax - logMin;
     const fraction = targetLogRange / logRange;
-    
+
     // Stretch to fill viewport: if showing fraction of log space, stretch by 1/fraction
     return 1 / fraction;
 }
@@ -317,7 +317,7 @@ export function getYPositionForFrequencyScaled(freq, originalNyquist, canvasHeig
     if (scaleType === 'logarithmic') {
         // 🦋 LOGARITHMIC: Calculate position at 1x (no playback scaling in log space!)
         // Use FIXED denominator (logMax = log10(originalNyquist)) to match spectrogram rendering
-        const minFreq = 0.1; // Avoid log(0)
+        const minFreq = State.MIN_FREQUENCY_HZ; // Avoid log(0)
         const freqSafe = Math.max(freq, minFreq);
         const logMin = Math.log10(minFreq);
         const logMax = Math.log10(originalNyquist); // FIXED denominator!
@@ -370,7 +370,7 @@ function generateLogTicks(maxFreq) {
     }
     
     // Add specific frequencies for better granularity
-    [0.3, 0.4, 0.7, 1.5, 3, 4, 7, 15, 30, 40].forEach(freq => {
+    [0.05, 0.07, 0.1, 0.15, 0.3, 0.4, 0.7, 1.5, 3, 4, 7, 15, 30, 40].forEach(freq => {
         if (freq > 0 && freq <= maxFreq) {
             ticks.push(freq);
         }
@@ -497,10 +497,14 @@ function generateLinearTicks(maxFreq, playbackRate) {
  */
 function formatFrequencyLabel(freq) {
     if (freq === 0) return '0';
-    
+
     if (freq < 1) {
         // Show decimals for sub-Hz
-        return freq.toFixed(1);
+        // Use 2 decimal places if second decimal is non-zero, otherwise 1
+        const rounded1 = freq.toFixed(1);
+        const rounded2 = freq.toFixed(2);
+        // If rounding to 1 decimal loses precision, show 2 decimals
+        return (parseFloat(rounded1) === parseFloat(rounded2)) ? rounded1 : rounded2;
     } else if (freq < 10) {
         // One decimal for 1-10 Hz
         return freq.toFixed(Number.isInteger(freq) ? 0 : 1);

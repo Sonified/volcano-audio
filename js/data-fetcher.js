@@ -449,10 +449,14 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
         
         console.log(`📊 ${logTime()} Normalization range: ${normMin} to ${normMax}`);
         
-        // Store metadata for duration calculation
+        // Store metadata for duration calculation and filename generation
         State.setCurrentMetadata({
             original_sample_rate: firstDayMeta.sample_rate,
-            npts: totalSamples
+            npts: totalSamples,
+            station: stationData.station,
+            channel: stationData.channel,
+            network: stationData.network,
+            location: stationData.location
         });
         
         // Store start/end times for x-axis rendering
@@ -966,15 +970,23 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
                                             return; // Tutorial controls its own messages
                                         }
                                         
-                                        // Check if returning to mid-session (Begin Analysis already clicked)
-                                        const { hasBegunAnalysisThisSession } = await import('./study-workflow.js');
+                                        // Check if in SHOWCASE mode (no Begin Analysis button)
+                                        const { isShowcaseMode } = await import('./master-modes.js');
                                         const { setStatusText } = await import('./tutorial-effects.js');
-                                        
-                                        if (hasBegunAnalysisThisSession()) {
-                                            setStatusText('Click and drag on the waveform to select a new region.', 'status info');
+
+                                        if (isShowcaseMode()) {
+                                            // SHOWCASE mode: no Begin Analysis button, go straight to creating regions
+                                            setStatusText('Click and drag on the waveform to create a new region.', 'status info');
                                         } else {
-                                            // New session - guide user to Begin Analysis
-                                            setStatusText('Click Begin Analysis to start your session.', 'status info');
+                                            // Study/other modes: Check if returning to mid-session (Begin Analysis already clicked)
+                                            const { hasBegunAnalysisThisSession } = await import('./study-workflow.js');
+
+                                            if (hasBegunAnalysisThisSession()) {
+                                                setStatusText('Click and drag on the waveform to select a new region.', 'status info');
+                                            } else {
+                                                // New session - guide user to Begin Analysis
+                                                setStatusText('Click Begin Analysis to start your session.', 'status info');
+                                            }
                                         }
                                     }
                                 }, 200);
@@ -1033,6 +1045,11 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
                                     }
                                 });
                                 document.getElementById('downloadBtn').disabled = false;
+                                document.getElementById('downloadAudioBtn').disabled = false;
+                                document.getElementById('downloadAudioBtn').style.cursor = 'pointer';
+                                document.getElementById('downloadAudioBtn').style.background = '#4a7c2f';
+                                document.getElementById('downloadAudioBtn').style.color = '#f1f8f4';
+                                document.getElementById('downloadAudioBtn').style.borderColor = '#5a8c3f';
                             } else {
                                 // Not all samples written yet - wait a bit and check again
                                 console.log(`⏳ ${logTime()} Waiting for more samples (${totalSamplesWritten}/${totalWorkletSamples})...`);
@@ -1684,7 +1701,12 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
         }
     }
     document.getElementById('downloadBtn').disabled = false;
-    
+    document.getElementById('downloadAudioBtn').disabled = false;
+    document.getElementById('downloadAudioBtn').style.cursor = 'pointer';
+    document.getElementById('downloadAudioBtn').style.background = '#4a7c2f';
+    document.getElementById('downloadAudioBtn').style.color = '#f1f8f4';
+    document.getElementById('downloadAudioBtn').style.borderColor = '#5a8c3f';
+
     // Enable loop button if tutorial is skipped (Personal mode or Study mode after first session)
     import('./master-modes.js').then(({ shouldSkipTutorial, isStudyMode }) => {
         const loopBtn = document.getElementById('loopBtn');

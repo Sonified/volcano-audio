@@ -1,0 +1,32 @@
+{
+  "participantId": "Robert_Test_Volcano_Now_Participant",
+  "surveyType": "CNS_POST",
+  "submissionTimestamp": "2025-12-12T10:22:38.847Z",
+  "responses": {
+    "cns1": 1,
+    "cns2": 1,
+    "cns3": 1,
+    "cns4": 1,
+    "cns5": 1,
+    "cns6": 1,
+    "cns7": 1,
+    "cns8": 1,
+    "cns9": 1,
+    "cns10": 1,
+    "cns11": 1,
+    "cns12": 1,
+    "cns13": 1,
+    "cns14": 1
+  },
+  "reverseScoreItems": [
+    4,
+    12,
+    14
+  ],
+  "rawTotal": 14,
+  "metadata": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "screenWidth": 1628,
+    "screenHeight": 1063
+  }
+}

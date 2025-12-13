@@ -66,14 +66,16 @@ export function cancelAllRAFLoops() {
  * Start playback (or resume if paused)
  * This is THE function for starting/resuming playback
  */
-export function startPlayback() {
+export async function startPlayback() {
+    console.log(`🔊 [startPlayback] ENTER - AudioContext state: ${State.audioContext?.state}, workletNode: ${State.workletNode ? 'exists' : 'null'}`);
+
     State.setPlaybackState(PlaybackState.PLAYING);
-    
+
     console.log('▶️ Starting playback');
-    
+
     // 🔥 Notify oscilloscope that playback started (for flame effect fade)
     setPlayingState(true);
-    
+
     // 🎓 Tutorial: Resolve promise if waiting for region play or resume
     if (State.waitingForRegionPlayOrResume && State._regionPlayOrResumeResolve) {
         State.setWaitingForRegionPlayOrResume(false);
@@ -83,32 +85,52 @@ export function startPlayback() {
         State.setRegionPlayClickResolve(null);
         resolve();
     }
-    
+
     // Update master button
     const btn = document.getElementById('playPauseBtn');
     btn.textContent = '⏸️ Pause';
-    btn.classList.remove('play-active', 'pulse-play', 'pulse-resume');
+    btn.classList.remove('play-active', 'pulse-play', 'pulse-resume', 'pulse-attention');
     btn.classList.add('pause-active');
-    
-    // Update status (selection tutorial message moved to waveform-renderer.js)
-    
-    // Resume AudioContext if needed
+
+    // 🔗 FIX: Resume AudioContext BEFORE telling worklet to play
+    // audioContext.resume() is async - must await it or worklet won't process!
     if (State.audioContext?.state === 'suspended') {
-        console.log('▶️ Resuming suspended AudioContext');
-        State.audioContext.resume();
+        console.log('🔊 [startPlayback] AudioContext is SUSPENDED - awaiting resume...');
+        await State.audioContext.resume();
+        console.log(`🔊 [startPlayback] AudioContext RESUMED - state: ${State.audioContext.state}`);
+    } else {
+        console.log(`🔊 [startPlayback] AudioContext already running - state: ${State.audioContext?.state}`);
     }
-    
+
     // 🏎️ AUTONOMOUS: Just tell worklet to play - it handles fade-in automatically
+    console.log('🔊 [startPlayback] Sending play message to worklet');
     State.workletNode?.port.postMessage({ type: 'play' });
-    
+
     // Restart playback indicator
     if (State.audioContext && State.totalAudioDuration > 0) {
         State.setLastUpdateTime(State.audioContext.currentTime);
         startPlaybackIndicator();
     }
-    
+
     // Update active region button
     updateActiveRegionPlayButton(true);
+
+    // 🔗 Shared session: Show zoom hint on first play (only once)
+    const isSharedSession = sessionStorage.getItem('isSharedSession') === 'true';
+    const sharedSessionHintShown = sessionStorage.getItem('sharedSessionHintShown') === 'true';
+    if (isSharedSession && !sharedSessionHintShown) {
+        sessionStorage.setItem('sharedSessionHintShown', 'true');
+        setTimeout(async () => {
+            const statusDiv = document.getElementById('status');
+            if (statusDiv) {
+                statusDiv.className = 'status';
+                const { typeText } = await import('./tutorial-effects.js');
+                typeText(statusDiv, 'Press the region # on your keyboard or click the 🔍 to ZOOM IN', 30, 10);
+            }
+        }, 2000);
+    }
+
+    console.log('🔊 [startPlayback] EXIT');
 }
 
 /**
@@ -170,12 +192,16 @@ function getRegionStartIfOutside() {
 
 export function togglePlayPause() {
     const currentState = `playbackState=${State.playbackState}, position=${State.currentAudioPosition?.toFixed(2) || 0}s`;
-    if (DEBUG_LOOP_FADES) console.log(`🎵 Master play/pause button clicked - ${currentState}`);
-    
-    if (!State.audioContext) return;
-    
+    console.log(`🎵 [togglePlayPause] ENTER - ${currentState}, AudioContext: ${State.audioContext?.state}`);
+
+    if (!State.audioContext) {
+        console.log('🎵 [togglePlayPause] EXIT - No AudioContext!');
+        return;
+    }
+
     switch (State.playbackState) {
         case PlaybackState.STOPPED:
+            console.log('🎵 [togglePlayPause] Case: STOPPED');
             // Check if zoomed into region and playhead is outside
             const regionStart = getRegionStartIfOutside();
             if (regionStart !== null) {
@@ -183,18 +209,20 @@ export function togglePlayPause() {
                 seekToPosition(regionStart, true);
                 break;
             }
-            
+
             const startPosition = isAtBoundaryEnd() ? getRestartPosition() : State.currentAudioPosition;
             console.log(`▶️ Starting playback from ${startPosition.toFixed(2)}s`);
             seekToPosition(startPosition, true);
             break;
-            
+
         case PlaybackState.PLAYING:
+            console.log('🎵 [togglePlayPause] Case: PLAYING → pause');
             console.log(`⏸️ Pausing playback`);
             pausePlayback();
             break;
-            
+
         case PlaybackState.PAUSED:
+            console.log('🎵 [togglePlayPause] Case: PAUSED → resume');
             // Check if zoomed into region and playhead is outside
             const regionStartPaused = getRegionStartIfOutside();
             if (regionStartPaused !== null) {
@@ -202,7 +230,7 @@ export function togglePlayPause() {
                 seekToPosition(regionStartPaused, true);
                 break;
             }
-            
+
             // Check if at end of current boundaries
             if (isAtBoundaryEnd()) {
                 const restartPos = getRestartPosition();
@@ -210,7 +238,7 @@ export function togglePlayPause() {
                 seekToPosition(restartPos, true);
                 break;
             }
-            
+
             console.log(`▶️ Resuming playback from ${State.currentAudioPosition.toFixed(2)}s`);
             startPlayback();
             break;
@@ -350,12 +378,25 @@ export function seekToPosition(targetPosition, shouldStartPlayback = false) {
     const b = getCurrentPlaybackBoundaries();
     targetPosition = Math.max(b.start, Math.min(targetPosition, b.end));
     
-    // if (DEBUG_LOOP_FADES) console.log(`🎯 Seeking to ${targetPosition.toFixed(2)}s (shouldStartPlayback=${shouldStartPlayback})`);
+    // ============================================
+    // THE FIX: Use playback_samples_per_real_second
+    // ============================================
+    // This tells us how many playback samples (44.1kHz) represent one real-world second
+    const samplesPerRealSecond = State.currentMetadata?.playback_samples_per_real_second 
+                               || State.currentMetadata?.original_sample_rate  // Legacy fallback
+                               || 1200;  // Reasonable default
+    
+    console.log(`🎯 SEEK: Target=${targetPosition.toFixed(2)}s`);
+    console.log(`   samplesPerRealSecond: ${samplesPerRealSecond.toFixed(2)}`);
+    console.log(`   totalAudioDuration: ${State.totalAudioDuration.toFixed(2)}s`);
+    
+    // Convert real-world seconds to playback sample index
+    const targetSample = Math.floor(targetPosition * samplesPerRealSecond);
+    console.log(`   targetSample: ${targetSample.toLocaleString()} (${targetPosition.toFixed(2)}s × ${samplesPerRealSecond.toFixed(2)})`);
     
     // Set flag to prevent race condition in region finish detection
     State.setJustSeeked(true);
     
-    const targetSample = Math.floor(targetPosition * 44100);
     const wasPlaying = State.playbackState === PlaybackState.PLAYING;
     
     const performSeek = () => {
@@ -395,17 +436,27 @@ export function seekToPosition(targetPosition, shouldStartPlayback = false) {
         // (It will handle fade-in automatically if needed)
         if (shouldStartPlayback) {
             State.setPlaybackState(PlaybackState.PLAYING);
-            
+
             // 🔥 Notify oscilloscope that playback started (for flame effect fade)
             setPlayingState(true);
-            
-            State.workletNode.port.postMessage({ type: 'play' });
-            
+
             // Update play/pause button to show "Pause"
             const btn = document.getElementById('playPauseBtn');
             btn.textContent = '⏸️ Pause';
-            btn.classList.remove('play-active', 'pulse-play', 'pulse-resume');
+            btn.classList.remove('play-active', 'pulse-play', 'pulse-resume', 'pulse-attention');
             btn.classList.add('pause-active');
+
+            // 🔗 FIX: Resume AudioContext BEFORE telling worklet to play!
+            if (State.audioContext?.state === 'suspended') {
+                console.log('🔊 [seekToPosition] AudioContext SUSPENDED - resuming...');
+                State.audioContext.resume().then(() => {
+                    console.log('🔊 [seekToPosition] AudioContext RESUMED, sending play');
+                    State.workletNode.port.postMessage({ type: 'play' });
+                });
+            } else {
+                console.log('🔊 [seekToPosition] AudioContext already running, sending play');
+                State.workletNode.port.postMessage({ type: 'play' });
+            }
         }
         
         // Ensure playback indicator continues if playing
@@ -509,16 +560,19 @@ function updatePlaybackDuration() {
     }
 }
 
-// Download audio as WAV file
+// Download audio as WAV file at 44.1kHz (our resampled playback version)
 export function downloadAudio() {
+    console.log('🔥 downloadAudio() called - VERSION 2 (44.1kHz)');
+
+    // Always use completeSamplesArray which is resampled to 44.1kHz by the AudioContext
     if (!State.completeSamplesArray || State.completeSamplesArray.length === 0) {
         console.warn('No audio data to download');
         return;
     }
-    
-    console.log('📥 Preparing audio download...');
-    
+
+    // completeSamplesArray is at 44100 Hz (AudioContext's native sample rate)
     const sampleRate = 44100;
+    console.log(`📥 Preparing WAV download: ${State.completeSamplesArray.length} samples @ ${sampleRate} Hz`);
     const numChannels = 1; // Mono
     const bytesPerSample = 2; // 16-bit
     const samples = State.completeSamplesArray;
@@ -563,70 +617,31 @@ export function downloadAudio() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-
-    // Generate filename: VolcanoName_Station_Last_24_Hrs_From_YYYY_MM_DD_HH_MMSS
-    let filename = 'volcano-audio';
-
-    // Get volcano name from dropdown
-    const volcanoSelect = document.getElementById('volcano');
-    const volcanoValue = volcanoSelect ? volcanoSelect.value : '';
-
-    // Map volcano codes to display names
-    const volcanoNames = {
-        'kilauea': 'Kilauea',
-        'maunaloa': 'Mauna_Loa',
-        'greatsitkin': 'Great_Sitkin',
-        'shishaldin': 'Shishaldin',
-        'spurr': 'Mount_Spurr'
-    };
-    const volcanoName = volcanoNames[volcanoValue] || volcanoValue || 'Unknown';
-
-    // Get station and duration
+    
+    // Generate filename from metadata
     const metadata = State.currentMetadata;
-    const dataStart = State.dataStartTime;
-    const dataEnd = State.dataEndTime;
-
-    if (dataStart && dataEnd) {
-        // Calculate duration in hours
-        const durationMs = dataEnd - dataStart;
-        const durationHours = Math.round(durationMs / (1000 * 60 * 60));
-
-        // Get station info from metadata (most reliable for actual fetched data)
-        let stationName = 'Unknown';
-        let sampleRate = 'Unknown';
-        let channel = 'Unknown';
-
-        if (metadata) {
-            stationName = metadata.station || 'Unknown';
-            sampleRate = metadata.original_sample_rate ? Math.round(metadata.original_sample_rate) : 'Unknown';
-            channel = metadata.channel || 'Unknown';
-        }
-
-        // Format start time as YYYY_MM_DD_HH_MM
-        const year = dataStart.getUTCFullYear();
-        const month = String(dataStart.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(dataStart.getUTCDate()).padStart(2, '0');
-        const hours = String(dataStart.getUTCHours()).padStart(2, '0');
-        const minutes = String(dataStart.getUTCMinutes()).padStart(2, '0');
-        const timeStr = `${year}_${month}_${day}_${hours}_${minutes}`;
-
-        // Format: VolcanoName_Station_Channel_SR##Hz_Last_24_Hrs_From_YYYY_MM_DD_HH_MM
-        filename = `${volcanoName}_${stationName}_${channel}_SR${sampleRate}Hz_Last_${durationHours}_Hrs_From_${timeStr}`;
+    let filename = 'solar-audio';
+    if (metadata && metadata.spacecraft && metadata.dataset) {
+        // Solar/spacecraft mode
+        const startDate = new Date(metadata.startTime);
+        const dateStr = startDate.toISOString().split('T')[0];
+        const timeStr = startDate.toISOString().split('T')[1].substring(0, 5).replace(':', '-');
+        filename = `${metadata.spacecraft}_${metadata.dataset}_${dateStr}_${timeStr}`;
     } else if (metadata && metadata.network && metadata.station) {
-        // Fallback if dataStartTime not available
+        // Volcano mode
         const startDate = new Date(metadata.starttime);
         const dateStr = startDate.toISOString().split('T')[0];
         const timeStr = startDate.toISOString().split('T')[1].substring(0, 5).replace(':', '-');
-        filename = `${volcanoName}_${metadata.station}_${dateStr}_${timeStr}`;
+        filename = `${metadata.network}_${metadata.station}_${dateStr}_${timeStr}`;
     }
-
     a.download = `${filename}.wav`;
-
+    
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-
-    console.log(`✅ Downloaded ${filename}.wav (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`);
+    
+    const durationSeconds = samples.length / sampleRate;
+    console.log(`✅ Downloaded ${filename}.wav (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB, ${sampleRate} Hz, ${durationSeconds.toFixed(1)}s duration)`);
 }
 

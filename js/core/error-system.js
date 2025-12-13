@@ -142,10 +142,19 @@ async function handleCriticalError(errorMessage, errorDetails) {
         
         const playPauseBtn = document.getElementById('playPauseBtn');
         if (playPauseBtn) playPauseBtn.disabled = true;
-        
+
         const downloadBtn = document.getElementById('downloadBtn');
         if (downloadBtn) downloadBtn.disabled = true;
-        
+
+        const downloadAudioBtn = document.getElementById('downloadAudioBtn');
+        if (downloadAudioBtn) {
+            downloadAudioBtn.disabled = true;
+            downloadAudioBtn.style.cursor = 'not-allowed';
+            downloadAudioBtn.style.background = 'rgba(60, 60, 60, 0.9)';
+            downloadAudioBtn.style.color = '#bbb';
+            downloadAudioBtn.style.borderColor = '#555';
+        }
+
         const completeBtn = document.getElementById('completeBtn');
         if (completeBtn) completeBtn.disabled = true;
     } catch (e) {

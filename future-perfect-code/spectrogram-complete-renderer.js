@@ -8,7 +8,7 @@
 
 import * as State from './audio-state.js';
 
-import { drawFrequencyAxis, positionAxisCanvas, resizeAxisCanvas, initializeAxisPlaybackRate } from './spectrogram-axis-renderer.js';
+import { drawFrequencyAxis, positionAxisCanvas, resizeAxisCanvas, initializeAxisPlaybackRate, getLogScaleMinFreq } from './spectrogram-axis-renderer.js';
 
 import { SpectrogramWorkerPool } from './spectrogram-worker-pool.js';
 
@@ -17,6 +17,20 @@ import { zoomState } from './zoom-state.js';
 import { getInterpolatedTimeRange, getZoomDirection, getZoomTransitionProgress, getOldTimeRange, isZoomTransitionInProgress, getRegionOpacityProgress } from './waveform-x-axis-renderer.js';
 import { drawSpectrogramRegionHighlights, drawSpectrogramSelection } from './region-tracker.js';
 import { isStudyMode } from './master-modes.js';
+import { getColorLUT } from './colormaps.js';
+
+/**
+ * Get the background/zero color from the current colormap LUT
+ * @returns {[number, number, number]} RGB values for the bottom of the colormap
+ */
+function getColormapBackgroundColor() {
+    const lut = getColorLUT();
+    if (lut && lut.length >= 3) {
+        return [lut[0], lut[1], lut[2]];
+    }
+    // Fallback to black if LUT not ready
+    return [0, 0, 0];
+}
 
 // Track if we've rendered the complete spectrogram
 let completeSpectrogramRendered = false;
@@ -47,9 +61,6 @@ let cachedZoomedSpectrogramCanvas = null;
 
 // Infinite canvas for GPU-accelerated viewport stretching
 let infiniteSpectrogramCanvas = null;
-
-// Track last playback rate used for viewport to detect rate changes
-let lastViewportPlaybackRate = 1.0;
 
 // Track the context of the current infinite canvas
 let infiniteCanvasContext = {
@@ -171,9 +182,9 @@ export function startMemoryMonitoring() {
     
     // Only log in dev/personal modes, not study mode
     if (!isStudyMode()) {
-        console.log('🏥 Starting memory health monitoring (every 10 seconds)');
+        console.log('🏥 Starting memory health monitoring (every 30 seconds)');
     }
-    memoryMonitorInterval = setInterval(memoryHealthCheck, 10000);
+    memoryMonitorInterval = setInterval(memoryHealthCheck, 30000);
     memoryHealthCheck();
 }
 
@@ -188,65 +199,7 @@ export function stopMemoryMonitoring() {
     }
 }
 
-/**
- * Convert HSL to RGB
- */
-// Pre-computed color LUT (computed once, reused for all renders)
-// Maps 256 intensity levels to RGB values using HSL color space
-let colorLUT = null;
-
-function initializeColorLUT() {
-    if (colorLUT !== null) return; // Already initialized
-    
-    colorLUT = new Uint8ClampedArray(256 * 3);
-    for (let i = 0; i < 256; i++) {
-        const normalized = i / 255;
-        const hue = normalized * 60;
-        const saturation = 100;
-        const lightness = 10 + (normalized * 60);
-        
-        const rgb = hslToRgb(hue, saturation, lightness);
-        colorLUT[i * 3] = rgb[0];
-        colorLUT[i * 3 + 1] = rgb[1];
-        colorLUT[i * 3 + 2] = rgb[2];
-    }
-    // Only log in dev/personal modes, not study mode
-    if (!isStudyMode()) {
-        console.log(`🎨 Pre-computed color LUT (256 levels) - cached for reuse`);
-    }
-}
-
-// Initialize color LUT on module load
-initializeColorLUT();
-
-function hslToRgb(h, s, l) {
-    h = h / 360;
-    s = s / 100;
-    l = l / 100;
-    
-    let r, g, b;
-    
-    if (s === 0) {
-        r = g = b = l;
-    } else {
-        const hue2rgb = (p, q, t) => {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q - p) * 6 * t;
-            if (t < 1/2) return q;
-            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-            return p;
-        };
-        
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
-    }
-    
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
+// Color LUT is now managed by colormaps.js module
 
 /**
  * Main function to render the complete spectrogram (FULL VIEW)
@@ -257,13 +210,15 @@ function hslToRgb(h, s, l) {
 export async function renderCompleteSpectrogram(skipViewportUpdate = false, forceFullView = false) {
     // Only log in dev/personal modes, not study mode
     if (!isStudyMode()) {
-        console.log(`🎨 [spectrogram-complete-renderer.js] renderCompleteSpectrogram CALLED: skipViewportUpdate=${skipViewportUpdate}, forceFullView=${forceFullView}`);
+        console.groupCollapsed('🎨 [RENDER] Spectrogram Rendering');
+        console.log(`🎨 [spectrogram-complete-renderer.js] renderCompleteSpectrogram CALLED: skipViewportUpdate=${skipViewportUpdate}`);
     }
     // console.trace('📍 Call stack:');
     
     if (!State.completeSamplesArray || State.completeSamplesArray.length === 0) {
         if (!isStudyMode()) {
             console.log('⚠️ Cannot render complete spectrogram - no audio data available');
+            console.groupEnd();
         }
         return;
     }
@@ -271,6 +226,7 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
     if (renderingInProgress) {
         if (!isStudyMode()) {
             console.log('⚠️ Spectrogram rendering already in progress');
+            console.groupEnd();
         }
         return;
     }
@@ -280,6 +236,7 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
         const regionRange = zoomState.getRegionRange();
         if (!isStudyMode()) {
             console.log(`🔍 Inside temple - rendering region instead`);
+            console.groupEnd();
         }
         // 🔥 FIX: Convert Date objects to seconds (renderCompleteSpectrogramForRegion expects seconds!)
         const dataStartMs = State.dataStartTime ? State.dataStartTime.getTime() : 0;
@@ -287,11 +244,12 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
         const endSeconds = (regionRange.endTime.getTime() - dataStartMs) / 1000;
         return await renderCompleteSpectrogramForRegion(startSeconds, endSeconds);
     }
-    
+
     // Skip "already rendered" check when forcing full view update
     if (!forceFullView && completeSpectrogramRendered) {
         if (!isStudyMode()) {
             console.log('✅ Complete spectrogram already rendered');
+            console.groupEnd();
         }
         return;
     }
@@ -342,11 +300,11 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
         if (!isStudyMode()) {
             console.log(`📊 Rendering spectrogram for ${totalSamples.toLocaleString()} samples (${(totalSamples / sampleRate).toFixed(2)}s)`);
         }
-        
-        // FFT parameters
-        const fftSize = 2048;
+
+        // FFT parameters (use State.fftSize from UI dropdown)
+        const fftSize = State.fftSize || 2048;
         const frequencyBinCount = fftSize / 2;
-        
+
         const maxTimeSlices = width;
         const hopSize = Math.floor((totalSamples - fftSize) / maxTimeSlices);
         const numTimeSlices = Math.min(maxTimeSlices, Math.floor((totalSamples - fftSize) / hopSize));
@@ -370,26 +328,43 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
             const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
             const originalNyquist = originalSampleRate / 2;
             
-            const frequency = (binIndex / totalBins) * originalNyquist;
+            // 🎯 LOG: Show what we're using for spectrogram rendering
+            if (!window._spectrogramMaxFreqLogged) {
+                console.log(`📊 ⭐ SPECTROGRAM RENDERING:`);
+                console.log(`   Original sampling rate: ${originalSampleRate.toFixed(2)} Hz`);
+                console.log(`   → Max frequency (Nyquist): ${originalNyquist.toFixed(2)} Hz`);
+                console.log(`   FFT bins will map: 0 Hz to ${originalNyquist.toFixed(2)} Hz`);
+                window._spectrogramMaxFreqLogged = true;
+            }
             
+            const frequency = (binIndex / totalBins) * originalNyquist;
+
             if (State.frequencyScale === 'logarithmic') {
-                const freqSafe = Math.max(frequency, State.MIN_FREQUENCY_HZ);
-                const logMin = Math.log10(State.MIN_FREQUENCY_HZ);
+                const minFreq = getLogScaleMinFreq();
+                const freqSafe = Math.max(frequency, minFreq);
+                const logMin = Math.log10(minFreq);
                 const logMax = Math.log10(originalNyquist);
                 const logFreq = Math.log10(freqSafe);
                 const normalizedLog = (logFreq - logMin) / (logMax - logMin);
-                
+
                 return canvasHeight - (normalizedLog * canvasHeight);
             } else if (State.frequencyScale === 'sqrt') {
-                const normalized = frequency / originalNyquist;
+                const minFreq = getLogScaleMinFreq();
+                const freqSafe = Math.max(frequency, minFreq);
+                // Normalize from minFreq to Nyquist
+                const normalized = (freqSafe - minFreq) / (originalNyquist - minFreq);
                 const sqrtNormalized = Math.sqrt(normalized);
                 return canvasHeight - (sqrtNormalized * canvasHeight);
             } else {
-                const normalized = frequency / originalNyquist;
+                // Linear scale
+                const minFreq = getLogScaleMinFreq();
+                const freqSafe = Math.max(frequency, minFreq);
+                // Normalize from minFreq to Nyquist
+                const normalized = (freqSafe - minFreq) / (originalNyquist - minFreq);
                 return canvasHeight - (normalized * canvasHeight);
             }
         };
-        
+
         // Create ImageData for direct pixel manipulation
         const imageData = ctx.createImageData(width, height);
         const pixels = imageData.data;
@@ -412,6 +387,7 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
         
         // Function to draw results from worker
         const drawResults = (results, progress, workerIndex) => {
+            const colorLUT = getColorLUT();
             for (const result of results) {
                 const { sliceIdx, magnitudes } = result;
                 
@@ -488,11 +464,7 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
             endSample: totalSamples,
             frequencyScale: State.frequencyScale
         };
-        console.log(`🎨 infiniteCanvas UPDATED to FULL VIEW:`, {
-            startSample: 0,
-            endSample: totalSamples,
-            frequencyScale: State.frequencyScale
-        });
+        // console.log(`🏛️ New self created: Full view (0-${totalSamples.toLocaleString()}), scale=${State.frequencyScale}`);
         
         // 🏠 STORE AS ELASTIC FRIEND (our source of truth for transitions!)
         cachedFullSpectrogramCanvas = tempCanvas;
@@ -526,8 +498,14 @@ export async function renderCompleteSpectrogram(skipViewportUpdate = false, forc
         
     } catch (error) {
         console.error('❌ Error rendering complete spectrogram:', error);
+        if (!isStudyMode()) {
+            console.groupEnd(); // End Spectrogram Rendering (on error)
+        }
     } finally {
         renderingInProgress = false;
+        if (!isStudyMode()) {
+            console.groupEnd(); // End Spectrogram Rendering
+        }
     }
 }
 
@@ -629,11 +607,6 @@ export function restoreInfiniteCanvasFromCache() {
         endSample: State.completeSamplesArray ? State.completeSamplesArray.length : 0,
         frequencyScale: State.frequencyScale
     };
-    console.log(`🎨 infiniteCanvas RESTORED from elastic friend (FULL VIEW):`, {
-        startSample: 0,
-        endSample: State.completeSamplesArray ? State.completeSamplesArray.length : 0,
-        frequencyScale: State.frequencyScale
-    });
     
     // 🔥 THE FIX: Ring the doorbell! The butterfly is home!
     completeSpectrogramRendered = true;  // Mark spectrogram as rendered for animation system
@@ -644,16 +617,20 @@ export function restoreInfiniteCanvasFromCache() {
     // logInfiniteCanvasState('restoreInfiniteCanvasFromCache COMPLETE - full view restored');
 }
 
+/**
+ * Clear complete spectrogram and free memory
+ */
 export function clearCompleteSpectrogram() {
     // Only log in dev/personal modes, not study mode
     if (!isStudyMode()) {
-        console.log('🧹 [spectrogram-complete-renderer.js] clearCompleteSpectrogram CALLED');
-        console.trace('📍 Call stack:');
+        console.groupCollapsed('🧹 [CLEANUP] Spectrogram & Resources');
+        console.log(`🧹 [spectrogram-complete-renderer.js] clearCompleteSpectrogram CALLED`);
+        // console.trace('📍 Call stack:');
         console.log('🧹 Starting aggressive spectrogram cleanup...');
     }
-    
+
     logMemory('Before cleanup');
-    
+
     const canvas = document.getElementById('spectrogram');
     if (canvas) {
         const ctx = canvas.getContext('2d');
@@ -723,6 +700,7 @@ export function clearCompleteSpectrogram() {
     // Only log in dev/personal modes, not study mode
     if (!isStudyMode()) {
         console.log('✅ Spectrogram cleanup complete');
+        console.groupEnd(); // End Cleanup
     }
 }
 
@@ -761,59 +739,6 @@ export function clearCachedFullSpectrogram() {
     // Don't clear during transitions - we need it!
     // Only clear on full cleanup
     // console.log('🏠 Keeping elastic friend around');
-}
-
-/**
- * 🏠 Update elastic friend in background (after frequency scale change while zoomed in)
- * Re-renders the full spectrogram so it's ready with the new scale when user zooms out
- * Does NOT touch the current display - purely background update
- */
-export async function updateElasticFriendInBackground() {
-    if (!isStudyMode()) {
-        console.log(`🏠 Updating elastic friend in background with ${State.frequencyScale} scale...`);
-    }
-    const startTime = performance.now();
-
-    // 🔥 FIX: Clone the current infinite canvas (region view) before rendering full view
-    // We must CLONE it because renderCompleteSpectrogram will destroy the original canvas
-    let clonedCanvas = null;
-    const savedContext = { ...infiniteCanvasContext };
-
-    if (infiniteSpectrogramCanvas && infiniteSpectrogramCanvas.width > 0) {
-        clonedCanvas = document.createElement('canvas');
-        clonedCanvas.width = infiniteSpectrogramCanvas.width;
-        clonedCanvas.height = infiniteSpectrogramCanvas.height;
-        const cloneCtx = clonedCanvas.getContext('2d');
-        cloneCtx.drawImage(infiniteSpectrogramCanvas, 0, 0);
-        if (!isStudyMode()) {
-            console.log(`🏠 Cloned region canvas: ${clonedCanvas.width}x${clonedCanvas.height}`);
-        }
-    }
-
-    try {
-        // Use existing render function with forceFullView=true to bypass region check
-        // skipViewportUpdate=true so we don't touch the display
-        await renderCompleteSpectrogram(true, true);
-
-        if (!isStudyMode()) {
-            const elapsed = performance.now() - startTime;
-            console.log(`🏠 Elastic friend updated in background (${elapsed.toFixed(0)}ms) - ready for zoom out!`);
-        }
-
-    } catch (error) {
-        console.error('❌ Error updating elastic friend in background:', error);
-    } finally {
-        // 🔥 FIX: Restore the region view from the clone
-        // The elastic friend is now in cachedFullSpectrogramCanvas, but we need
-        // infiniteSpectrogramCanvas to remain the REGION view for display
-        if (clonedCanvas && clonedCanvas.width > 0) {
-            infiniteSpectrogramCanvas = clonedCanvas;
-            infiniteCanvasContext = savedContext;
-            if (!isStudyMode()) {
-                console.log(`🏠 Restored region view from clone (context: ${savedContext.startSample}-${savedContext.endSample})`);
-            }
-        }
-    }
 }
 
 // Track frequency scale when caching so we can detect mismatches
@@ -868,7 +793,60 @@ export function clearCachedZoomedSpectrogram() {
         cachedZoomedSpectrogramCanvas.width = 0;
         cachedZoomedSpectrogramCanvas.height = 0;
         cachedZoomedSpectrogramCanvas = null;
-        if (!isStudyMode()) console.log('🧹 Cleared zoomed cache');
+        console.log('🧹 Cleared zoomed cache');
+    }
+}
+
+/**
+ * 🏠 Update elastic friend in background (after frequency scale change while zoomed in)
+ * Re-renders the full spectrogram so it's ready with the new scale when user zooms out
+ * Does NOT touch the current display - purely background update
+ */
+export async function updateElasticFriendInBackground() {
+    if (!isStudyMode()) {
+        console.log(`🏠 Updating elastic friend in background with ${State.frequencyScale} scale...`);
+    }
+    const startTime = performance.now();
+
+    // 🔧 FIX: Clone the current infinite canvas (region view) before rendering full view
+    // We must CLONE it because renderCompleteSpectrogram will destroy the original canvas
+    let clonedCanvas = null;
+    const savedContext = { ...infiniteCanvasContext };
+
+    if (infiniteSpectrogramCanvas && infiniteSpectrogramCanvas.width > 0) {
+        clonedCanvas = document.createElement('canvas');
+        clonedCanvas.width = infiniteSpectrogramCanvas.width;
+        clonedCanvas.height = infiniteSpectrogramCanvas.height;
+        const cloneCtx = clonedCanvas.getContext('2d');
+        cloneCtx.drawImage(infiniteSpectrogramCanvas, 0, 0);
+        if (!isStudyMode()) {
+            console.log(`🏠 Cloned region canvas: ${clonedCanvas.width}x${clonedCanvas.height}`);
+        }
+    }
+
+    try {
+        // Use existing render function with forceFullView=true to bypass region check
+        // skipViewportUpdate=true so we don't touch the display
+        await renderCompleteSpectrogram(true, true);
+
+        if (!isStudyMode()) {
+            const elapsed = performance.now() - startTime;
+            console.log(`🏠 Elastic friend updated in background (${elapsed.toFixed(0)}ms) - ready for zoom out!`);
+        }
+
+    } catch (error) {
+        console.error('❌ Error updating elastic friend in background:', error);
+    } finally {
+        // 🔧 FIX: Restore the region view from the clone
+        // The elastic friend is now in cachedFullSpectrogramCanvas, but we need
+        // infiniteSpectrogramCanvas to remain the REGION view for display
+        if (clonedCanvas && clonedCanvas.width > 0) {
+            infiniteSpectrogramCanvas = clonedCanvas;
+            infiniteCanvasContext = savedContext;
+            if (!isStudyMode()) {
+                console.log(`🏠 Restored region view from clone (context: ${savedContext.startSample}-${savedContext.endSample})`);
+            }
+        }
     }
 }
 
@@ -1069,7 +1047,7 @@ export function drawInterpolatedSpectrogram() {
                 );
             } else {
                 // Shrinking down - fill background and draw at bottom
-                const [r, g, b] = hslToRgb(0, 100, 10);
+                const [r, g, b] = getColormapBackgroundColor();
                 ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
                 ctx.fillRect(currentX, 0, currentWidth, height);
                 
@@ -1142,7 +1120,7 @@ export function drawInterpolatedSpectrogram() {
                 );
                 
                 // Fill background
-                const [r, g, b] = hslToRgb(0, 100, 10);
+                const [r, g, b] = getColormapBackgroundColor();
                 ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
                 
                 // LEFT edge
@@ -1214,7 +1192,7 @@ export function drawInterpolatedSpectrogram() {
         );
     } else {
         // Shrinking down - fill top with dark background, draw shrunk portion at bottom
-        const [r, g, b] = hslToRgb(0, 100, 10);
+        const [r, g, b] = getColormapBackgroundColor();
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillRect(0, 0, width, height);
         
@@ -1366,16 +1344,17 @@ function calculateStretchFactor(playbackRate, frequencyScale) {
     } else if (frequencyScale === 'logarithmic') {
         const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
         const originalNyquist = originalSampleRate / 2;
+        const minFreq = getLogScaleMinFreq();
 
-        const logMin = Math.log10(State.MIN_FREQUENCY_HZ);
+        const logMin = Math.log10(minFreq);
         const logMax = Math.log10(originalNyquist);
         const logRange = logMax - logMin;
 
         const targetMaxFreq = originalNyquist / playbackRate;
-        const logTargetMax = Math.log10(Math.max(targetMaxFreq, State.MIN_FREQUENCY_HZ));
+        const logTargetMax = Math.log10(Math.max(targetMaxFreq, minFreq));
         const targetLogRange = logTargetMax - logMin;
         const fraction = targetLogRange / logRange;
-        
+
         return 1 / fraction;
     }
     
@@ -1477,7 +1456,7 @@ export function getSpectrogramViewport(playbackRate) {
             // Already filled with black above
         }
     } else {
-        const [r, g, b] = hslToRgb(0, 100, 10);
+        const [r, g, b] = getColormapBackgroundColor();
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillRect(0, 0, width, height);
         
@@ -1544,13 +1523,15 @@ export function getSpectrogramViewport(playbackRate) {
  * Update spectrogram viewport with GPU-accelerated stretching
  */
 export function updateSpectrogramViewport(playbackRate) {
-    // 🎯 DEBUG: Log every call
-    console.log(`🎨 updateSpectrogramViewport called (playbackRate=${playbackRate.toFixed(2)})`);
-    console.trace('📍 Call stack');
-
     // 🎯 DEBUG: Log if called during zoom out transition
     if (isZoomTransitionInProgress() && !getZoomDirection()) {
-        console.log(`🛑 BLOCKED: zoom-out transition in progress`);
+        // const progress = getZoomTransitionProgress();
+        // console.error(`🔴🔴🔴 updateSpectrogramViewport called DURING ZOOM OUT! playbackRate=${playbackRate.toFixed(2)}, progress=${progress.toFixed(3)}`);
+        // console.trace('🔴 Stack trace for updateSpectrogramViewport during zoom out:');
+
+        // 🚨 CRITICAL: During zoom-out, DON'T touch the canvas!
+        // drawInterpolatedSpectrogram handles the entire transition
+        // console.log(`🛑 BLOCKING updateSpectrogramViewport during zoom-out (progress=${progress.toFixed(3)})`);
         return;
     }
 
@@ -1612,7 +1593,7 @@ export function updateSpectrogramViewport(playbackRate) {
             width, height
         );
     } else {
-        const [r, g, b] = hslToRgb(0, 100, 10);
+        const [r, g, b] = getColormapBackgroundColor();
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillRect(0, 0, width, height);
         
@@ -1653,12 +1634,9 @@ export function updateSpectrogramViewport(playbackRate) {
     
     // NOTE: Selection box now drawn on separate overlay canvas (spectrogram-renderer.js)
     // No need to draw it here - completely separate layer with no conflicts!
-
+    
     // NOTE: Feature box positions are updated AFTER zoom transitions complete
     // (in region-tracker.js zoom completion callbacks), not during animation loops
-
-    // Update last playback rate for next comparison
-    lastViewportPlaybackRate = playbackRate;
 }
 
 /**
@@ -1774,9 +1752,11 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
         ctx.clearRect(0, 0, width, height);
     }
 
-    // 🔥 CRITICAL FIX: Use original sample rate (50 Hz), NOT AudioContext rate (44100 Hz)!
-    // completeSamplesArray is at original sample rate, not resampled to 44100 yet
-    const originalSampleRate = State.currentMetadata?.original_sample_rate || 50;
+    // 🔥 CRITICAL FIX: Use playback_samples_per_real_second, NOT original_sample_rate!
+    // completeSamplesArray is at 44.1kHz, but indexed by "playback samples per real second"
+    // This tells us how many samples correspond to one second of real-world time
+    // original_sample_rate might be the INSTRUMENT rate (50 Hz), which is WRONG!
+    const originalSampleRate = zoomState.sampleRate; // Uses playback_samples_per_real_second
     
     // 🎯 Determine actual render bounds (expanded window for smart render, or target for normal)
     let renderStartSeconds, renderEndSeconds;
@@ -1829,17 +1809,40 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
             return;
         }
         const startTime = performance.now();
-        const regionSamples = State.completeSamplesArray.slice(startSample, endSample);
+        // 🔥 CRITICAL: Convert original sample indices to resampled indices
+        // startSample/endSample are in original coordinate system, but completeSamplesArray is resampled
+        const resampledStartSample = zoomState.originalToResampledSample(startSample);
+        const resampledEndSample = zoomState.originalToResampledSample(endSample);
+        const regionSamples = State.completeSamplesArray.slice(resampledStartSample, resampledEndSample);
         const totalSamples = regionSamples.length;
         const renderDuration = renderEndSeconds - renderStartSeconds;
         const targetDuration = endSeconds - startSeconds;
-        
-        // console.log(`📊 Region: ${totalSamples.toLocaleString()} samples (${renderDuration.toFixed(2)}s)`);
-        
-        // FFT parameters
-        const fftSize = 2048;
+
+        // 🔬 DIAGNOSTIC: Sample extraction details
+        // const zoomStateSampleRate = zoomState.sampleRate;
+        // const playbackSamplesPerRealSecond = State.currentMetadata?.playback_samples_per_real_second;
+        // console.log(`🔬 [SPECTROGRAM REGION] Sample extraction:`, {
+        //     originalSampleRate,
+        //     zoomStateSampleRate,
+        //     playbackSamplesPerRealSecond,
+        //     MISMATCH_DETECTED: Math.abs(originalSampleRate - zoomStateSampleRate) > 1,
+        //     completeSamplesArrayLength: State.completeSamplesArray.length,
+        //     renderStartSeconds: renderStartSeconds.toFixed(2),
+        //     renderEndSeconds: renderEndSeconds.toFixed(2),
+        //     startSample: startSample.toLocaleString(),
+        //     endSample: endSample.toLocaleString(),
+        //     resampledStartSample: resampledStartSample.toLocaleString(),
+        //     resampledEndSample: resampledEndSample.toLocaleString(),
+        //     regionSamplesLength: regionSamples.length.toLocaleString(),
+        //     fftSize: State.fftSize || 2048,
+        //     hasEnoughForFFT: regionSamples.length > (State.fftSize || 2048),
+        //     expectedSamplesAtZoomRate: Math.floor((renderEndSeconds - renderStartSeconds) * zoomStateSampleRate).toLocaleString()
+        // });
+
+        // FFT parameters (use State.fftSize from UI dropdown)
+        const fftSize = State.fftSize || 2048;
         const frequencyBinCount = fftSize / 2;
-        
+
         // 🎯 SMART QUALITY ZONES: Calculate hopSize per section
         // Target region: full quality (normal hopSize)
         // Buffer regions: half quality (2x hopSize = half the time slices)
@@ -1886,15 +1889,20 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
                 // console.log('🎯 Quality zones (RIGHT entry): Left=1/8 quality (8x faster), Target=full (1x)');
             } else {
                 // CENTER: Left buffer (1/8) + Target (full) + Right buffer (1/8)
-                const bufferDuration = (totalDuration - targetDuration) / 2;
-                const bufferPixelsEach = Math.max(1, Math.floor((width - targetPixels) / 2));
-                const remainingPixels = Math.max(1, width - targetPixels - bufferPixelsEach);
-                const leftMidSeconds = renderStartSeconds + bufferDuration;
-                const rightMidSeconds = leftMidSeconds + targetDuration;
+                // 🔥 FIX: Use actual target bounds, not calculated centered position!
+                // When expanded range is clamped to dataset bounds, target is NOT centered
+                const leftBufferDuration = startSeconds - renderStartSeconds;
+                const rightBufferDuration = renderEndSeconds - endSeconds;
+                const leftBufferRatio = leftBufferDuration / totalDuration;
+                const rightBufferRatio = rightBufferDuration / totalDuration;
+                const bufferPixelsLeft = Math.max(1, Math.floor(width * leftBufferRatio));
+                const bufferPixelsRight = Math.max(1, Math.floor(width * rightBufferRatio));
+                const actualTargetPixels = Math.max(1, width - bufferPixelsLeft - bufferPixelsRight);
+
                 renderPlan = [
-                    { start: renderStartSeconds, end: leftMidSeconds, endSample: targetStartSample, pixels: bufferPixelsEach, quality: 'half', label: 'Left Buffer' },
-                    { start: leftMidSeconds, end: rightMidSeconds, endSample: targetEndSample, pixels: targetPixels, quality: 'full', label: 'Target' },
-                    { start: rightMidSeconds, end: renderEndSeconds, endSample: endSample, pixels: remainingPixels, quality: 'half', label: 'Right Buffer' }
+                    { start: renderStartSeconds, end: startSeconds, endSample: targetStartSample, pixels: bufferPixelsLeft, quality: 'half', label: 'Left Buffer' },
+                    { start: startSeconds, end: endSeconds, endSample: targetEndSample, pixels: actualTargetPixels, quality: 'full', label: 'Target' },
+                    { start: endSeconds, end: renderEndSeconds, endSample: endSample, pixels: bufferPixelsRight, quality: 'half', label: 'Right Buffer' }
                 ];
                 // console.log('🎯 Quality zones (CENTER): Left=1/8, Target=full, Right=1/8');
             }
@@ -1927,23 +1935,31 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
         const getYPosition = (binIndex, totalBins, canvasHeight) => {
             const originalSampleRate = State.currentMetadata?.original_sample_rate || 100;
             const originalNyquist = originalSampleRate / 2;
-            
+
             const frequency = (binIndex / totalBins) * originalNyquist;
-            
+
             if (State.frequencyScale === 'logarithmic') {
-                const freqSafe = Math.max(frequency, State.MIN_FREQUENCY_HZ);
-                const logMin = Math.log10(State.MIN_FREQUENCY_HZ);
+                const minFreq = getLogScaleMinFreq();
+                const freqSafe = Math.max(frequency, minFreq);
+                const logMin = Math.log10(minFreq);
                 const logMax = Math.log10(originalNyquist);
                 const logFreq = Math.log10(freqSafe);
                 const normalizedLog = (logFreq - logMin) / (logMax - logMin);
-                
+
                 return canvasHeight - (normalizedLog * canvasHeight);
             } else if (State.frequencyScale === 'sqrt') {
-                const normalized = frequency / originalNyquist;
+                const minFreq = getLogScaleMinFreq();
+                const freqSafe = Math.max(frequency, minFreq);
+                // Normalize from minFreq to Nyquist
+                const normalized = (freqSafe - minFreq) / (originalNyquist - minFreq);
                 const sqrtNormalized = Math.sqrt(normalized);
                 return canvasHeight - (sqrtNormalized * canvasHeight);
             } else {
-                const normalized = frequency / originalNyquist;
+                // Linear scale
+                const minFreq = getLogScaleMinFreq();
+                const freqSafe = Math.max(frequency, minFreq);
+                // Normalize from minFreq to Nyquist
+                const normalized = (freqSafe - minFreq) / (originalNyquist - minFreq);
                 return canvasHeight - (normalized * canvasHeight);
             }
         };
@@ -1968,7 +1984,19 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
             const zoneSampleEnd = Math.floor(zoneEndRelativeToRender * originalSampleRate);
             const zoneSamples = regionSamples.slice(Math.max(0, zoneSampleStart), Math.min(regionSamples.length, zoneSampleEnd));
             const zoneSampleCount = zoneSamples.length;
-            
+
+            // 🔬 DIAGNOSTIC: Zone sample calculation
+            // console.log(`🔬 [ZONE ${zoneIdx}] "${zone.label}":`, {
+            //     zoneTimeRange: `${zone.start.toFixed(2)}s - ${zone.end.toFixed(2)}s`,
+            //     zoneRelativeTime: `${zoneStartRelativeToRender.toFixed(2)}s - ${zoneEndRelativeToRender.toFixed(2)}s`,
+            //     zoneSampleStart,
+            //     zoneSampleEnd,
+            //     regionSamplesLength: regionSamples.length,
+            //     zoneSampleCount,
+            //     fftSize,
+            //     hasEnoughForFFT: zoneSampleCount > fftSize
+            // });
+
             // Calculate hopSize based on quality
             // Buffer zones: 1/8 quality (8x hopSize) - motion hides the low quality!
             // Target zone: full quality (1x hopSize)
@@ -2028,25 +2056,74 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
             const zonePixelsPerSlice = zone.pixels / zoneNumTimeSlices;
             
             // Draw callback for this zone
+            let firstResultLogged = false;
+            let pixelsWritten = 0;
             const drawZoneResults = (results, progress, workerIndex) => {
+                const colorLUT = getColorLUT();
                 for (const result of results) {
                     const { sliceIdx, magnitudes } = result;
                     const xStart = Math.floor(sliceIdx * zonePixelsPerSlice);
                     const xEnd = Math.floor((sliceIdx + 1) * zonePixelsPerSlice);
-                    
+
+                    // 🔬 Log first result
+                    // if (!firstResultLogged) {
+                    //     const maxMag = Math.max(...magnitudes);
+                    //     const minMag = Math.min(...magnitudes);
+
+                    //     // Test one bin's color calculation
+                    //     const testBin = 512;
+                    //     const testMag = magnitudes[testBin];
+                    //     const testDb = 20 * Math.log10(testMag + 1e-10);
+                    //     const testNormDb = Math.max(0, Math.min(1, (testDb + 100) / 100));
+                    //     const testColorIdx = Math.floor(testNormDb * 255);
+                    //     const testR = colorLUT ? colorLUT[testColorIdx * 3] : 'NO_LUT';
+                    //     const testG = colorLUT ? colorLUT[testColorIdx * 3 + 1] : 'NO_LUT';
+                    //     const testB = colorLUT ? colorLUT[testColorIdx * 3 + 2] : 'NO_LUT';
+
+                    //     // Test Y positions for bin 512
+                    //     const testYStart = Math.floor(getYPosition(testBin + 1, frequencyBinCount, height));
+                    //     const testYEnd = Math.floor(getYPosition(testBin, frequencyBinCount, height));
+
+                    //     console.log(`🔬 [DRAW] First result:`, {
+                    //         sliceIdx,
+                    //         xStart, xEnd,
+                    //         magnitudesLength: magnitudes.length,
+                    //         maxMagnitude: maxMag,
+                    //         minMagnitude: minMag,
+                    //         colorLUTExists: !!colorLUT,
+                    //         colorLUTLength: colorLUT?.length
+                    //     });
+                    //     console.log(`🔬 [DRAW] Color test (bin ${testBin}):`, {
+                    //         testMag,
+                    //         testDb,
+                    //         testNormDb,
+                    //         testColorIdx,
+                    //         testRGB: [testR, testG, testB],
+                    //         testYStart,
+                    //         testYEnd,
+                    //         yLoopRuns: testYStart < testYEnd ? testYEnd - testYStart : 0
+                    //     });
+                    //     firstResultLogged = true;
+                    // }
+
                     for (let binIdx = 0; binIdx < frequencyBinCount; binIdx++) {
                         const magnitude = magnitudes[binIdx];
                         const db = 20 * Math.log10(magnitude + 1e-10);
                         const normalizedDb = Math.max(0, Math.min(1, (db + 100) / 100));
                         const colorIndex = Math.floor(normalizedDb * 255);
-                        
+
                         const r = colorLUT[colorIndex * 3];
                         const g = colorLUT[colorIndex * 3 + 1];
                         const b = colorLUT[colorIndex * 3 + 2];
-                        
+
                         const yStart = Math.floor(getYPosition(binIdx + 1, frequencyBinCount, height));
                         const yEnd = Math.floor(getYPosition(binIdx, frequencyBinCount, height));
-                        
+
+                        // 🔬 Log Y position issue on first bin
+                        // if (!firstResultLogged && binIdx === 0) {
+                        //     console.log(`🔬 [DRAW] Y positions:`, { binIdx, yStart, yEnd, loopWillRun: yStart < yEnd });
+                        // }
+
                         for (let x = xStart; x < xEnd; x++) {
                             for (let y = yStart; y < yEnd; y++) {
                                 const pixelIndex = (y * zone.pixels + x) * 4;
@@ -2054,12 +2131,24 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
                                 zonePixels[pixelIndex + 1] = g;
                                 zonePixels[pixelIndex + 2] = b;
                                 zonePixels[pixelIndex + 3] = 255;
+                                pixelsWritten++;
                             }
                         }
                     }
                 }
             };
             
+            // Track if callback was called
+            let callbackCallCount = 0;
+            let totalResultsProcessed = 0;
+
+            // Wrap callback to track calls
+            const trackingCallback = (results, progress, workerIndex) => {
+                callbackCallCount++;
+                totalResultsProcessed += results.length;
+                drawZoneResults(results, progress, workerIndex);
+            };
+
             // Process this zone with worker pool
             await workerPool.processBatches(
                 zoneSamples,
@@ -2067,9 +2156,18 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
                 fftSize,
                 zoneHopSize,
                 window,
-                drawZoneResults
+                trackingCallback
             );
-            
+
+            // 🔬 DIAGNOSTIC: Check if FFT processing worked
+            // console.log(`🔬 [ZONE ${zoneIdx}] FFT processing complete:`, {
+            //     callbackCalls: callbackCallCount,
+            //     totalResults: totalResultsProcessed,
+            //     expectedBatches: zoneBatches.length,
+            //     zoneNumTimeSlices,
+            //     pixelsWritten
+            // });
+
             // 🔥 PROTECTION: Check for cancellation after each zone
             if (signal.aborted) {
                 console.log('🛑 Render cancelled during zone processing');
@@ -2079,6 +2177,33 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
                 return;
             }
             
+            // 🔬 DIAGNOSTIC: Check if zoneImageData has any content
+            // Check BOTTOM of canvas (where low frequencies / signal is drawn)
+            let hasNonBlackPixels = false;
+            const zonePixelData = zoneImageData.data;
+            const startFromBottom = Math.max(0, zonePixelData.length - 40000); // Check last ~10k pixels (bottom)
+            for (let i = startFromBottom; i < zonePixelData.length; i += 4) {
+                if (zonePixelData[i] > 5 || zonePixelData[i + 1] > 5 || zonePixelData[i + 2] > 5) {
+                    hasNonBlackPixels = true;
+                    break;
+                }
+            }
+            // Also sample middle of canvas
+            const middleStart = Math.floor(zonePixelData.length / 2) - 2000;
+            for (let i = middleStart; i < middleStart + 4000 && !hasNonBlackPixels; i += 4) {
+                if (zonePixelData[i] > 5 || zonePixelData[i + 1] > 5 || zonePixelData[i + 2] > 5) {
+                    hasNonBlackPixels = true;
+                    break;
+                }
+            }
+            // console.log(`🔬 [ZONE ${zoneIdx}] ImageData check:`, {
+            //     hasNonBlackPixels,
+            //     imageDataWidth: zoneImageData.width,
+            //     imageDataHeight: zoneImageData.height,
+            //     dataLength: zonePixelData.length,
+            //     checkedFromBottom: startFromBottom
+            // });
+
             // Composite this zone onto the final canvas
             tempCtx.putImageData(zoneImageData, currentXOffset, 0);
             currentXOffset += zone.pixels;
@@ -2129,8 +2254,11 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
         }
         
         // 🔥 DIAGNOSTIC: Verify finalCanvas has content before creating infinite canvas
+        // Check BOTTOM of canvas (where low frequencies / signal is drawn)
         const finalCtxCheck = finalCanvas.getContext('2d');
-        const checkImageData = finalCtxCheck.getImageData(0, 0, Math.min(100, finalCanvas.width), Math.min(100, finalCanvas.height));
+        const checkHeight = Math.min(100, finalCanvas.height);
+        const checkY = Math.max(0, finalCanvas.height - checkHeight); // Start from bottom
+        const checkImageData = finalCtxCheck.getImageData(0, checkY, Math.min(100, finalCanvas.width), checkHeight);
         let finalCanvasHasContent = false;
         for (let i = 0; i < checkImageData.data.length; i += 4) {
             if (checkImageData.data[i] > 5 || checkImageData.data[i + 1] > 5 || checkImageData.data[i + 2] > 5) {
@@ -2139,6 +2267,15 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
             }
         }
         
+        // 🔬 DIAGNOSTIC: Always log what we found
+        // console.log(`🔬 [FINAL CANVAS] Content check:`, {
+        //     finalCanvasHasContent,
+        //     checkY,
+        //     checkHeight,
+        //     canvasSize: `${finalCanvas.width}x${finalCanvas.height}`,
+        //     checkedRegion: `y=${checkY} to y=${checkY + checkHeight}`
+        // });
+
         if (!finalCanvasHasContent && !isStudyMode()) {
             console.warn('⚠️ renderCompleteSpectrogramForRegion: finalCanvas has no visible content before creating infinite canvas!', {
                 finalCanvasSize: `${finalCanvas.width}x${finalCanvas.height}`,
@@ -2176,12 +2313,7 @@ export async function renderCompleteSpectrogramForRegion(startSeconds, endSecond
             endSample: endSample,
             frequencyScale: State.frequencyScale
         };
-        console.log(`🎨 infiniteCanvas UPDATED to REGION VIEW:`, {
-            startSample,
-            endSample,
-            frequencyScale: State.frequencyScale,
-            duration: `${((endSample - startSample) / (State.currentMetadata?.original_sample_rate || 50)).toFixed(2)}s`
-        });
+        // console.log(`🏛️ New temple self created: Region (${startSample.toLocaleString()}-${endSample.toLocaleString()}), scale=${State.frequencyScale}`);
         
         // logInfiniteCanvasState('renderCompleteSpectrogramForRegion COMPLETE - region canvas created');
         
@@ -2338,13 +2470,13 @@ function updateSpectrogramOverlay() {
  */
 export async function startCompleteVisualization() {
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     if (!State.completeSamplesArray || State.completeSamplesArray.length === 0) {
         console.log('⚠️ Cannot start complete visualization - no audio data');
         return;
     }
-    
+
     console.log('🎬 Starting complete spectrogram visualization');
-    
+
     await renderCompleteSpectrogram();
 }

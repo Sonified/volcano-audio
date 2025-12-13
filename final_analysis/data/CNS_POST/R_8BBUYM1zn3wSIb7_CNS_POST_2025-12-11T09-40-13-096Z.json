@@ -1,0 +1,32 @@
+{
+  "participantId": "R_8BBUYM1zn3wSIb7",
+  "surveyType": "CNS_POST",
+  "submissionTimestamp": "2025-12-11T09:40:13.096Z",
+  "responses": {
+    "cns1": 4,
+    "cns2": 4,
+    "cns3": 5,
+    "cns4": 2,
+    "cns5": 5,
+    "cns6": 4,
+    "cns7": 1,
+    "cns8": 2,
+    "cns9": 5,
+    "cns10": 1,
+    "cns11": 2,
+    "cns12": 5,
+    "cns13": 1,
+    "cns14": 1
+  },
+  "reverseScoreItems": [
+    4,
+    12,
+    14
+  ],
+  "rawTotal": 42,
+  "metadata": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15",
+    "screenWidth": 1470,
+    "screenHeight": 840
+  }
+}

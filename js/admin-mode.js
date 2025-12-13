@@ -13,7 +13,7 @@ let adminMode = false;
 export function applyAdminModeUI() {
     // Control groups to hide in user mode
     const userModeHiddenControlGroups = [
-        'stationControlGroup',    // Station dropdown
+        // 'stationControlGroup',    // Station dropdown - SHOWCASE mode needs this visible
         'durationControlGroup',   // Duration dropdown
         'forceIrisControlGroup',  // Force IRIS Fetch button
     ];

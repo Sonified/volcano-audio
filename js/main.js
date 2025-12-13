@@ -13,7 +13,7 @@ import * as State from './audio-state.js';
 import { PlaybackState } from './audio-state.js';
 import { togglePlayPause, toggleLoop, changePlaybackSpeed, changeVolume, resetSpeedTo1, resetVolumeTo1, updatePlaybackSpeed, downloadAudio, cancelAllRAFLoops, setResizeRAFRef } from './audio-player.js';
 import { initWaveformWorker, setupWaveformInteraction, drawWaveform, drawWaveformFromMinMax, drawWaveformWithSelection, changeWaveformFilter, updatePlaybackIndicator, startPlaybackIndicator } from './waveform-renderer.js';
-import { changeFrequencyScale, loadFrequencyScale, startVisualization, setupSpectrogramSelection, cleanupSpectrogramSelection, redrawAllCanvasFeatureBoxes } from './spectrogram-renderer.js';
+import { changeFrequencyScale, changeMinFrequency, loadFrequencyScale, startVisualization, setupSpectrogramSelection, cleanupSpectrogramSelection, redrawAllCanvasFeatureBoxes } from './spectrogram-renderer.js';
 import { clearCompleteSpectrogram, startMemoryMonitoring } from './spectrogram-complete-renderer.js';
 import { loadStations, loadSavedVolcano, updateStationList, enableFetchButton, purgeCloudflareCache, openParticipantModal, closeParticipantModal, submitParticipantSetup, openWelcomeModal, closeWelcomeModal, openEndModal, closeEndModal, openPreSurveyModal, closePreSurveyModal, submitPreSurvey, openPostSurveyModal, closePostSurveyModal, submitPostSurvey, openActivityLevelModal, closeActivityLevelModal, submitActivityLevelSurvey, openAwesfModal, closeAwesfModal, submitAwesfSurvey, changeBaseSampleRate, handleWaveformFilterChange, resetWaveformFilterToDefault, setupModalEventListeners, attemptSubmission, openBeginAnalysisModal, openCompleteConfirmationModal, openTutorialRevisitModal } from './ui-controls.js';
 import { getParticipantIdFromURL, storeParticipantId, getParticipantId } from './qualtrics-api.js';
@@ -34,13 +34,14 @@ import { zoomState } from './zoom-state.js';
 import { initKeyboardShortcuts, cleanupKeyboardShortcuts } from './keyboard-shortcuts.js';
 import { setStatusText, appendStatusText, initTutorial, disableFrequencyScaleDropdown, removeVolumeSliderGlow } from './tutorial.js';
 import { isTutorialActive } from './tutorial-state.js';
-import { 
-    CURRENT_MODE, 
-    AppMode, 
-    isPersonalMode, 
-    isDevMode, 
+import {
+    CURRENT_MODE,
+    AppMode,
+    isPersonalMode,
+    isDevMode,
     isStudyMode,
-    initializeMasterMode 
+    initializeMasterMode,
+    shouldEnableAdminFeatures
 } from './master-modes.js';
 
 // Helper function to safely check study mode (handles cases where module isn't loaded yet)
@@ -515,7 +516,18 @@ export async function startStreaming(event) {
         if (volcanoSelect) {
             volcanoSelect.classList.remove('pulse-glow');
         }
-        
+
+        // 🔧 Update minimum frequency for selected volcano
+        if (volcanoSelect && volcanoSelect.value) {
+            const minFreq = State.getMinFrequencyForVolcano(volcanoSelect.value);
+            State.setMinFrequencyHz(minFreq);
+            const minFreqInput = document.getElementById('minFrequencyInput');
+            if (minFreqInput) {
+                minFreqInput.value = minFreq;
+                console.log(`📊 Set min frequency to ${minFreq} Hz for ${volcanoSelect.value}`);
+            }
+        }
+
         // Clear complete spectrogram when loading new data
         clearCompleteSpectrogram();
         
@@ -966,7 +978,12 @@ export async function startStreaming(event) {
         playPauseBtn.textContent = '⏸️ Pause';
         playPauseBtn.classList.remove('pause-active', 'play-active', 'loop-active', 'pulse-play', 'pulse-resume');
         document.getElementById('downloadBtn').disabled = true;
-        
+        document.getElementById('downloadAudioBtn').disabled = true;
+        document.getElementById('downloadAudioBtn').style.cursor = 'not-allowed';
+        document.getElementById('downloadAudioBtn').style.background = 'rgba(60, 60, 60, 0.9)';
+        document.getElementById('downloadAudioBtn').style.color = '#bbb';
+        document.getElementById('downloadAudioBtn').style.borderColor = '#555';
+
         // Don't disable loop button - it should remain enabled during data loading
         
         State.setPlaybackState(PlaybackState.PLAYING);
@@ -1051,6 +1068,11 @@ export async function startStreaming(event) {
         document.getElementById('playPauseBtn').disabled = true;
         // Don't disable loop button on error - keep it enabled if it was enabled before
         document.getElementById('downloadBtn').disabled = true;
+        document.getElementById('downloadAudioBtn').disabled = true;
+        document.getElementById('downloadAudioBtn').style.cursor = 'not-allowed';
+        document.getElementById('downloadAudioBtn').style.background = 'rgba(60, 60, 60, 0.9)';
+        document.getElementById('downloadAudioBtn').style.color = '#bbb';
+        document.getElementById('downloadAudioBtn').style.borderColor = '#555';
     }
 }
 
@@ -1061,11 +1083,21 @@ async function updateParticipantIdDisplay() {
     const participantId = getParticipantId();
     const displayElement = document.getElementById('participantIdDisplay');
     const valueElement = document.getElementById('participantIdValue');
+    const textElement = document.getElementById('participantIdText');
+
+    // Update label based on mode
+    const { isShowcaseMode } = await import('./master-modes.js');
+    if (textElement && isShowcaseMode()) {
+        // In SHOWCASE mode, show "User Name:" instead of "Participant ID:"
+        textElement.innerHTML = `User Name: <span id="participantIdValue" style="font-weight: 600; color: #bbb;">${participantId || '--'}</span>`;
+    } else if (valueElement) {
+        // In other modes, just update the value
+        valueElement.textContent = participantId || '--';
+    }
 
     // Always show the participant ID display (even if no ID set)
     // This allows users to see and click to enter their ID
     if (displayElement) displayElement.style.display = 'block';
-    if (valueElement) valueElement.textContent = participantId || '--';
 
     // Check if username is "results2025" - show results panel
     if (participantId && participantId.toLowerCase() === 'results2025') {
@@ -1081,10 +1113,10 @@ async function updateParticipantIdDisplay() {
         const { hideResultsPanel } = await import('./ui-controls.js');
         hideResultsPanel();
         // Reset page title and header
-        document.title = 'Volcano Audification Study';
+        document.title = 'Volcano Seismic Audification Portal';
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) {
-            pageTitle.textContent = 'Volcano Audification Study';
+            pageTitle.textContent = 'Volcano Seismic Audification Portal';
         }
     }
 }
@@ -1092,6 +1124,54 @@ async function updateParticipantIdDisplay() {
 // ═══════════════════════════════════════════════════════════
 // 🎯 MODE INITIALIZATION FUNCTIONS
 // ═══════════════════════════════════════════════════════════
+
+/**
+ * SHOWCASE MODE: Like personal mode but prompts for participant ID
+ * Perfect for demos and presentations - no surveys, no timeout, no tutorial
+ */
+async function initializeShowcaseMode() {
+    console.log('✨ SHOWCASE MODE: Demo mode with participant ID');
+
+    // Set tutorial flags (skip tutorial, go straight to analysis)
+    localStorage.setItem('study_tutorial_in_progress', 'false');
+    localStorage.setItem('study_tutorial_completed', 'true');
+    localStorage.setItem('study_has_seen_tutorial', 'true');
+    localStorage.removeItem('study_begin_analysis_clicked_this_session');
+
+    console.log('🧹 Set showcase mode tutorial flags: completed=true, in_progress=false');
+
+    // Enable all features immediately
+    const { enableAllTutorialRestrictedFeatures, setStatusText } = await import('./tutorial-effects.js');
+    enableAllTutorialRestrictedFeatures();
+
+    // Show initial message to guide user
+    setStatusText('👈 Click "Fetch Data" to begin.', 'status info');
+
+    // Volcano dropdown is never disabled in showcase mode (not a study mode)
+    const volcanoSelect = document.getElementById('volcano');
+    if (volcanoSelect) {
+        volcanoSelect.disabled = false;
+        volcanoSelect.style.opacity = '1';
+        volcanoSelect.style.cursor = 'pointer';
+        console.log('🌋 Volcano selector always enabled in showcase mode');
+    }
+
+    // Show participant modal on startup
+    // 🎯 TOGGLE: Set to true to show every time (for testing), false to show only first time
+    const SHOW_MODAL_EVERY_TIME = false;
+
+    setTimeout(() => {
+        const storedParticipantId = localStorage.getItem('participantId');
+        if (SHOW_MODAL_EVERY_TIME || !storedParticipantId || storedParticipantId.trim().length === 0) {
+            openParticipantModal();
+            console.log('👤 Opened participant ID modal for showcase mode');
+        } else {
+            console.log('✅ Participant ID already stored, skipping modal');
+        }
+    }, 500);
+
+    console.log('✅ Showcase mode ready - all features enabled');
+}
 
 /**
  * PERSONAL MODE: Direct access, no tutorial, no surveys
@@ -1273,14 +1353,18 @@ async function initializeStudyMode() {
  */
 async function initializeApp() {
     const { CURRENT_MODE, AppMode } = await import('./master-modes.js');
-    
+
     console.log(`🚀 Initializing app in ${CURRENT_MODE} mode`);
-    
+
     switch (CURRENT_MODE) {
+        case AppMode.SHOWCASE:
+            await initializeShowcaseMode();
+            break;
+
         case AppMode.PERSONAL:
             await initializePersonalMode();
             break;
-            
+
         case AppMode.DEV:
             await initializeDevMode();
             break;
@@ -1348,17 +1432,26 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.log('═══════════════════════════════════════════════════════════');
     console.log('🌋 VOLCANO AUDIFICATION STUDY');
     console.log('═══════════════════════════════════════════════════════════');
-    
+
     // ═══════════════════════════════════════════════════════════
     // 📏 STATUS AUTO-RESIZE - Shrink font when text overflows
     // ═══════════════════════════════════════════════════════════
     const { setupStatusAutoResize } = await import('./status-auto-resize.js');
     setupStatusAutoResize();
-    
+
     // ═══════════════════════════════════════════════════════════
     // 🎯 MASTER MODE - Initialize and check configuration
     // ═══════════════════════════════════════════════════════════
     const { initializeMasterMode, shouldSkipTutorial, isStudyMode, isPersonalMode, isDevMode, isTutorialEndMode, CURRENT_MODE, AppMode } = await import('./master-modes.js');
+
+    // Set page title immediately based on mode (before any rendering)
+    if (CURRENT_MODE === AppMode.SHOWCASE) {
+        document.title = 'Volcano Seismic Audification Portal';
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) {
+            pageTitle.textContent = 'Volcano Seismic Audification Portal';
+        }
+    }
     initializeMasterMode();
     
     // Initialize error reporter early (catches errors during initialization)
@@ -1387,12 +1480,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     // - Local production study mode only: Hidden by default, revealed by "dvdv"
     
     const isPureProductionStudy = CURRENT_MODE === AppMode.PRODUCTION;
+    const isShowcaseMode = CURRENT_MODE === AppMode.SHOWCASE;
     const isTestMode = CURRENT_MODE === AppMode.STUDY_CLEAN ||
                        CURRENT_MODE === AppMode.STUDY_W2_S1 ||
                        CURRENT_MODE === AppMode.STUDY_W2_S1_RETURNING ||
                        CURRENT_MODE === AppMode.STUDY_W2_S2 ||
                        CURRENT_MODE === AppMode.TUTORIAL_END;
-    
+
     if (!isLocal) {
         // Production: Hide mode selector (study mode is enforced)
         if (modeSelectorContainer) {
@@ -1402,40 +1496,42 @@ window.addEventListener('DOMContentLoaded', async () => {
         console.log('🔒 Mode selector hidden (production environment)');
     } else if (isLocal && !isPureProductionStudy) {
         // Local: Show for all modes EXCEPT pure production study
-        // This includes: dev, personal, study_clean, study_w2_s1, study_w2_s2, tutorial_end
+        // This includes: dev, personal, showcase, study_clean, study_w2_s1, study_w2_s2, tutorial_end
         if (modeSelectorContainer) {
             modeSelectorContainer.style.visibility = 'visible';
             modeSelectorContainer.style.opacity = '1';
         }
         if (isTestMode) {
             console.log('🧪 Mode selector visible (test mode)');
+        } else if (isShowcaseMode) {
+            console.log('🔓 Mode selector visible (showcase mode)');
         } else {
             console.log('🔓 Mode selector visible (dev/personal mode)');
         }
     } else if (isPureProductionStudy && isLocal) {
-        // Pure production study mode (local): Hidden by default, revealed by "dvdv"
+        // Production study mode (local): Hidden by default, revealed by "dvdv"
         console.log('🔒 Mode selector hidden (type "dvdv" to reveal)');
     }
 
-    // Secret key sequence to reveal mode selector (hardcoded, no server needed)
+    // Sequence to reveal mode selector (hardcoded, no server needed)
     // Only used for study modes
-    const modeSelectorSecret = 'dvdv';
-    
+    const modeSelectorSequence = 'dvdv';
+
     // Track key sequence
     let keySequence = '';
     let keySequenceTimeout = null;
-    
+
     // Function to show mode selector
     function showModeSelector() {
         if (modeSelectorContainer) {
             modeSelectorContainer.style.visibility = 'visible';
             modeSelectorContainer.style.opacity = '1';
-            console.log('🔓 Mode selector revealed (secret sequence detected)');
+            console.log('🔓 Mode selector revealed (sequence detected)');
         }
     }
-    
-    // Listen for secret key sequence (anytime, anywhere)
-    function handleSecretKeyListener(e) {
+
+    // Listen for key sequence (anytime, anywhere)
+    function handleSequenceListener(e) {
         // Skip if key is undefined (can happen with some special keys)
         if (!e.key) {
             return;
@@ -1452,14 +1548,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         // Add current key to sequence
         keySequence += e.key.toLowerCase();
 
-        // Keep only last N characters (where N is secret length)
-        const secretLength = modeSelectorSecret.length;
-        if (keySequence.length > secretLength) {
-            keySequence = keySequence.slice(-secretLength);
+        // Keep only last N characters
+        const sequenceLength = modeSelectorSequence.length;
+        if (keySequence.length > sequenceLength) {
+            keySequence = keySequence.slice(-sequenceLength);
         }
 
-        // Check if sequence matches secret
-        if (keySequence === modeSelectorSecret.toLowerCase()) {
+        // Check if sequence matches
+        if (keySequence === modeSelectorSequence.toLowerCase()) {
             showModeSelector();
             keySequence = ''; // Reset sequence
             if (keySequenceTimeout) {
@@ -1468,17 +1564,17 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
         }
     }
-    
+
     // Add key listener on page load (only for pure production study mode in local environment)
-    // Production (not local): Disable secret key sequence (study mode is enforced)
-    // Test modes: Don't need secret sequence (mode selector already visible)
+    // Production (not local): Disable key sequence (study mode is enforced)
+    // Test modes: Don't need sequence (mode selector already visible)
     if (isPureProductionStudy && isLocal) {
-        window.addEventListener('keydown', handleSecretKeyListener);
+        window.addEventListener('keydown', handleSequenceListener);
     }
 
-    // 🐛 DEBUG: Secret key sequence to jump to study end walkthrough
+    // 🐛 DEBUG: Sequence to jump to study end walkthrough
     // Useful for testing the tail end of the tutorial
-    const debugJumpSecret = 'testend';
+    const debugJumpSequence = 'testend';
     let debugKeySequence = '';
     let debugKeySequenceTimeout = null;
 
@@ -1500,13 +1596,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         debugKeySequence += e.key.toLowerCase();
 
         // Keep only last N characters
-        const secretLength = debugJumpSecret.length;
-        if (debugKeySequence.length > secretLength) {
-            debugKeySequence = debugKeySequence.slice(-secretLength);
+        const sequenceLength = debugJumpSequence.length;
+        if (debugKeySequence.length > sequenceLength) {
+            debugKeySequence = debugKeySequence.slice(-sequenceLength);
         }
 
         // Check if sequence matches
-        if (debugKeySequence === debugJumpSecret.toLowerCase()) {
+        if (debugKeySequence === debugJumpSequence.toLowerCase()) {
             console.log('🐛 DEBUG: Jumping to study end walkthrough...');
             debugKeySequence = ''; // Reset
             if (debugKeySequenceTimeout) {
@@ -1563,22 +1659,31 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
-    // Simulate panel: hidden in Study Mode, shown in dev/personal modes
+    // Simulate panel: shown only when admin features are enabled
     const simulatePanel = document.querySelector('.panel-simulate');
-    if (isStudyMode()) {
-        // Already hidden by default in HTML, just log
-        if (simulatePanel) {
-            console.log('🎓 Production Mode: Simulate panel hidden (surveys controlled by workflow)');
-        }
-        
-        // Permanent overlay in Production Mode (fully controlled by modal system)
-        // Modal system checks flags and decides whether to show overlay
-        console.log('🎓 Production Mode: Modal system controls overlay (based on workflow flags)');
-    } else {
-        // Show simulate panel in non-Study modes (Dev, Personal, TUTORIAL_END)
+    if (shouldEnableAdminFeatures()) {
+        // Show simulate panel in admin-enabled modes (Dev, Personal, TUTORIAL_END)
         if (simulatePanel) {
             simulatePanel.style.display = 'block';
         }
+    } else {
+        // Hide in Study Mode and SHOWCASE mode
+        if (simulatePanel) {
+            if (isStudyMode()) {
+                console.log('🎓 Production Mode: Simulate panel hidden (surveys controlled by workflow)');
+            } else {
+                console.log('✅ SHOWCASE Mode: Simulate panel hidden');
+            }
+        }
+
+        // Permanent overlay in Production Mode (fully controlled by modal system)
+        // Modal system checks flags and decides whether to show overlay
+        if (isStudyMode()) {
+            console.log('🎓 Production Mode: Modal system controls overlay (based on workflow flags)');
+        }
+    }
+
+    if (!isStudyMode()) {
 
         // Hide permanent overlay in non-Study modes (Dev, Personal, TUTORIAL_END)
         const permanentOverlay = document.getElementById('permanentOverlay');
@@ -1689,7 +1794,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Initialize keyboard shortcuts
     initKeyboardShortcuts();
-    
+
     // Initialize admin mode (applies user mode by default)
     initAdminMode();
     
@@ -1707,7 +1812,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Load saved volcano selection (or use default)
     await loadSavedVolcano();
-    
+
+    // Initialize min frequency based on selected volcano
+    const volcanoSelect = document.getElementById('volcano');
+    if (volcanoSelect && volcanoSelect.value) {
+        const minFreq = State.getMinFrequencyForVolcano(volcanoSelect.value);
+        State.setMinFrequencyHz(minFreq);
+        const minFreqInput = document.getElementById('minFrequencyInput');
+        if (minFreqInput) {
+            minFreqInput.value = minFreq;
+            console.log(`📊 Initialized min frequency to ${minFreq} Hz for ${volcanoSelect.value}`);
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     // 🎯 MODE-AWARE ROUTING
     // ═══════════════════════════════════════════════════════════
@@ -1730,11 +1847,20 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         const selectedVolcano = e.target.value;
         const volcanoWithData = State.volcanoWithData;
-        
+
+        // 🔧 Update minimum frequency for this volcano
+        const minFreq = State.getMinFrequencyForVolcano(selectedVolcano);
+        State.setMinFrequencyHz(minFreq);
+        const minFreqInput = document.getElementById('minFrequencyInput');
+        if (minFreqInput) {
+            minFreqInput.value = minFreq;
+            console.log(`📊 Set min frequency to ${minFreq} Hz for ${selectedVolcano}`);
+        }
+
         // 🔧 FIX: Don't switch regions here! The user is still viewing old data.
         // Regions will switch when "Fetch Data" is clicked (via startStreaming → switchVolcanoRegions)
         // The dropdown just selects WHICH volcano to fetch next, doesn't change current data/regions
-        
+
         // 🎨 Visual reminder: If there's loaded data from a different volcano, mark it as "(Currently Loaded)"
         if (volcanoWithData && selectedVolcano !== volcanoWithData) {
             updateVolcanoDropdownLabels(volcanoWithData, selectedVolcano);
@@ -1742,7 +1868,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             // User switched back to the loaded volcano - clear the flag
             updateVolcanoDropdownLabels(null, selectedVolcano);
         }
-        
+
         // 🎯 In STUDY mode: prevent re-fetching same volcano (one volcano per session)
         // 👤 In PERSONAL/DEV modes: allow re-fetching any volcano anytime
         if (isStudyMode() && volcanoWithData && selectedVolcano === volcanoWithData) {
@@ -1758,7 +1884,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 fetchBtn.title = '';
             }
         }
-        
+
         e.target.blur(); // Blur so spacebar can toggle play/pause
     });
     document.getElementById('dataType').addEventListener('change', (e) => {
@@ -1796,7 +1922,24 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('volumeLabel').addEventListener('click', resetVolumeTo1);
     
     document.getElementById('frequencyScale').addEventListener('change', changeFrequencyScale);
-    
+
+    // Min frequency input (for logarithmic scale lower bound)
+    const minFreqInput = document.getElementById('minFrequencyInput');
+    if (minFreqInput) {
+        minFreqInput.addEventListener('change', changeMinFrequency);
+        minFreqInput.addEventListener('blur', changeMinFrequency);
+        // Load saved value from localStorage
+        const savedMinFreq = localStorage.getItem('minFrequencyHz');
+        if (savedMinFreq) {
+            const parsedValue = parseFloat(savedMinFreq);
+            if (!isNaN(parsedValue) && parsedValue > 0) {
+                minFreqInput.value = parsedValue;
+                State.setMinFrequencyHz(parsedValue);
+                console.log(`📊 Loaded saved min frequency: ${parsedValue} Hz`);
+            }
+        }
+    }
+
     document.getElementById('waveformFilterLabel').addEventListener('click', resetWaveformFilterToDefault);
     
     setupWaveformInteraction();
@@ -2133,6 +2276,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Cache & Download
     document.getElementById('purgeCacheBtn').addEventListener('click', purgeCloudflareCache);
     document.getElementById('downloadBtn').addEventListener('click', downloadAudio);
+    document.getElementById('downloadAudioBtn').addEventListener('click', downloadAudio);
     
     // Station Selection
     document.getElementById('volcano').addEventListener('change', (e) => {
