@@ -620,7 +620,8 @@ export function downloadAudio() {
         filename = `${volcanoName}_${metadata.station}_${dateStr}_${timeStr}`;
     }
 
-    a.download = `${filename}.wav`;
+    // Ensure .wav extension (don't double-add if already present)
+    a.download = filename.endsWith('.wav') ? filename : `${filename}.wav`;
 
     document.body.appendChild(a);
     a.click();
