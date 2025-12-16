@@ -646,7 +646,7 @@ export async function startStreaming(event) {
         let startTime;
         let estimatedEndTime;
 
-        const participantId = getParticipantId();
+        // Use participantId from earlier (already declared above)
         if (participantId && participantId.toLowerCase() === 'timelord') {
             // Try to get Time Lord date range
             const { getTimeLordDateRange } = await import('./time-lord-panel.js');
