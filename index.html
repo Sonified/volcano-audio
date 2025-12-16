@@ -105,34 +105,26 @@
 
         <!-- Time Lord Panel (shown only for "timelord" user) -->
         <div class="panel panel-timelord" id="timeLordPanel" style="padding: 10px 20px; display: none;">
-            <div style="display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;">
-                <!-- Title -->
-                <div style="display: flex; flex-direction: column; justify-content: flex-end; margin-right: 8px;">
-                    <span style="font-weight: 700; font-size: 18px; color: #333; white-space: nowrap;">⏰ Time Lord</span>
-                </div>
-
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: nowrap;">
                 <!-- Start Date/Time -->
-                <div style="width: 200px;">
-                    <label for="timeLordStartDate" style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #555;">Start Date & Time:</label>
-                    <input type="datetime-local" id="timeLordStartDate" style="width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="timeLordStartDate" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">Start Date & Time:</label>
+                    <input type="datetime-local" id="timeLordStartDate" style="padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
                 </div>
 
                 <!-- End Date/Time -->
-                <div style="width: 200px;">
-                    <label for="timeLordEndDate" style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #555;">End Date & Time:</label>
-                    <input type="datetime-local" id="timeLordEndDate" style="width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="timeLordEndDate" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">End Date & Time:</label>
+                    <input type="datetime-local" id="timeLordEndDate" style="padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
                 </div>
-
-                <!-- Search Button -->
-                <button type="button" id="timeLordSearchBtn" style="padding: 8px 20px; font-size: 14px; font-weight: 600; background: #007bff; border-color: #007bff; color: white; border-radius: 4px; white-space: nowrap;">Search</button>
 
                 <!-- Spacer to push recent searches to the right -->
                 <div style="flex: 1;"></div>
 
                 <!-- Recent Searches -->
-                <div style="width: 300px;">
-                    <label for="timeLordRecentSearches" style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #555;">Recent Searches:</label>
-                    <select id="timeLordRecentSearches" style="width: 100%; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="timeLordRecentSearches" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">Recent Searches:</label>
+                    <select id="timeLordRecentSearches" style="width: 300px; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
                         <option value="">No recent searches</option>
                     </select>
                 </div>

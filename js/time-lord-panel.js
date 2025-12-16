@@ -170,13 +170,7 @@ function setDefaultTimes() {
  * Setup event listeners
  */
 function setupEventListeners() {
-    const searchBtn = document.getElementById('timeLordSearchBtn');
     const recentSearchesDropdown = document.getElementById('timeLordRecentSearches');
-
-    // Search button click
-    if (searchBtn) {
-        searchBtn.addEventListener('click', handleSearch);
-    }
 
     // Recent search selection
     if (recentSearchesDropdown) {
@@ -185,23 +179,22 @@ function setupEventListeners() {
 }
 
 /**
- * Handle search button click
+ * Get the current time lord date range (for integration with fetch button)
+ * Returns null if dates are invalid
  */
-async function handleSearch() {
+export function getTimeLordDateRange() {
     const startInput = document.getElementById('timeLordStartDate');
     const endInput = document.getElementById('timeLordEndDate');
 
     if (!startInput || !endInput) {
-        console.error('❌ Date inputs not found');
-        return;
+        return null;
     }
 
     const startDate = startInput.value;
     const endDate = endInput.value;
 
     if (!startDate || !endDate) {
-        alert('Please enter both start and end date/time');
-        return;
+        return null;
     }
 
     // Validate date range
@@ -209,18 +202,24 @@ async function handleSearch() {
     const end = new Date(endDate);
 
     if (start >= end) {
-        alert('Start date must be before end date');
-        return;
+        console.warn('⚠️ Time Lord: Start date must be before end date');
+        return null;
     }
 
-    console.log('⏰ Time Lord search:', { startDate, endDate });
+    return {
+        startDate,
+        endDate,
+        startTime: start,
+        endTime: end
+    };
+}
 
-    // Add to recent searches
+/**
+ * Record a search in recent searches (called after successful fetch)
+ */
+export function recordTimeLordSearch(startDate, endDate) {
+    console.log('⏰ Recording Time Lord search:', { startDate, endDate });
     addRecentSearch(startDate, endDate);
-
-    // TODO: Trigger data fetch with these times
-    // For now, just log the search
-    alert(`Searching for data from:\n${formatSearchLabel(startDate, endDate)}\n\n(Data fetch integration coming soon!)`);
 }
 
 /**
