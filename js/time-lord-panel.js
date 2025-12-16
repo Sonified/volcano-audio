@@ -62,18 +62,20 @@ function saveRecentSearches() {
 /**
  * Add a search to recent searches (moves to top if already exists)
  */
-function addRecentSearch(startDate, endDate) {
+function addRecentSearch(startDate, endDate, volcano, station) {
     // Create search object
     const search = {
         startDate,
         endDate,
+        volcano,
+        station,
         timestamp: new Date().toISOString(),
-        label: formatSearchLabel(startDate, endDate)
+        label: formatSearchLabel(startDate, endDate, volcano, station)
     };
 
     // Remove if already exists (we'll re-add at top)
     recentSearches = recentSearches.filter(s =>
-        s.startDate !== startDate || s.endDate !== endDate
+        s.startDate !== startDate || s.endDate !== endDate || s.volcano !== volcano || s.station !== station
     );
 
     // Add to top
@@ -92,7 +94,7 @@ function addRecentSearch(startDate, endDate) {
 /**
  * Format a search label for display
  */
-function formatSearchLabel(startDate, endDate) {
+function formatSearchLabel(startDate, endDate, volcano, station) {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -105,7 +107,13 @@ function formatSearchLabel(startDate, endDate) {
         return `${year}-${month}-${day} ${hours}:${minutes}`;
     };
 
-    return `${formatDate(start)} → ${formatDate(end)}`;
+    // Get volcano name from dropdown
+    const volcanoSelect = document.getElementById('volcano');
+    const volcanoName = volcanoSelect ?
+        volcanoSelect.querySelector(`option[value="${volcano}"]`)?.textContent || volcano :
+        volcano;
+
+    return `${volcanoName} - ${station} - ${formatDate(start)} → ${formatDate(end)}`;
 }
 
 /**
@@ -217,15 +225,15 @@ export function getTimeLordDateRange() {
 /**
  * Record a search in recent searches (called after successful fetch)
  */
-export function recordTimeLordSearch(startDate, endDate) {
-    console.log('⏰ Recording Time Lord search:', { startDate, endDate });
-    addRecentSearch(startDate, endDate);
+export function recordTimeLordSearch(startDate, endDate, volcano, station) {
+    console.log('⏰ Recording Time Lord search:', { startDate, endDate, volcano, station });
+    addRecentSearch(startDate, endDate, volcano, station);
 }
 
 /**
  * Handle recent search selection
  */
-function handleRecentSearchSelection(event) {
+async function handleRecentSearchSelection(event) {
     const selectedOption = event.target.selectedOptions[0];
 
     if (!selectedOption || !selectedOption.dataset.searchData) {
@@ -234,18 +242,51 @@ function handleRecentSearchSelection(event) {
 
     const search = JSON.parse(selectedOption.dataset.searchData);
 
-    // Populate date inputs
+    console.log('⏰ Selected recent search:', search.label);
+
+    // 1. Update volcano dropdown
+    const volcanoSelect = document.getElementById('volcano');
+    if (volcanoSelect && search.volcano) {
+        volcanoSelect.value = search.volcano;
+        console.log(`✅ Set volcano to: ${search.volcano}`);
+
+        // Trigger change event to load stations
+        volcanoSelect.dispatchEvent(new Event('change'));
+    }
+
+    // 2. Wait for stations to load, then set station
+    if (search.station) {
+        // Give stations time to load
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const stationSelect = document.getElementById('station');
+        if (stationSelect) {
+            stationSelect.value = search.station;
+            console.log(`✅ Set station to: ${search.station}`);
+        }
+    }
+
+    // 3. Update date inputs
     const startInput = document.getElementById('timeLordStartDate');
     const endInput = document.getElementById('timeLordEndDate');
 
     if (startInput) startInput.value = search.startDate;
     if (endInput) endInput.value = search.endDate;
+    console.log(`✅ Set dates: ${search.startDate} → ${search.endDate}`);
 
-    console.log('⏰ Selected recent search:', search.label);
+    // 4. Move this search to the top
+    addRecentSearch(search.startDate, search.endDate, search.volcano, search.station);
 
-    // Move this search to the top
-    addRecentSearch(search.startDate, search.endDate);
-
-    // Reset dropdown to placeholder
+    // 5. Reset dropdown to placeholder
     event.target.selectedIndex = 0;
+
+    // 6. Trigger fetch automatically
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn && !startBtn.disabled) {
+        console.log('🚀 Auto-triggering data fetch for selected search');
+        startBtn.click();
+    } else {
+        console.warn('⚠️ Fetch button not available for auto-trigger');
+    }
 }

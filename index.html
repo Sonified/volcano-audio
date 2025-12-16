@@ -103,34 +103,6 @@
             </div>
         </div>
 
-        <!-- Time Lord Panel (shown only for "timelord" user) -->
-        <div class="panel panel-timelord" id="timeLordPanel" style="padding: 10px 20px; display: none;">
-            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: nowrap;">
-                <!-- Start Date/Time -->
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <label for="timeLordStartDate" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">Start Date & Time:</label>
-                    <input type="datetime-local" id="timeLordStartDate" style="padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
-                </div>
-
-                <!-- End Date/Time -->
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <label for="timeLordEndDate" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">End Date & Time:</label>
-                    <input type="datetime-local" id="timeLordEndDate" style="padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
-                </div>
-
-                <!-- Spacer to push recent searches to the right -->
-                <div style="flex: 1;"></div>
-
-                <!-- Recent Searches -->
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <label for="timeLordRecentSearches" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">Recent Searches:</label>
-                    <select id="timeLordRecentSearches" style="width: 300px; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
-                        <option value="">No recent searches</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
         <div class="panel panel-selection">
             <div class="controls">
                 <div class="control-group" style="flex-direction: row; align-items: center; gap: 8px;">
@@ -223,7 +195,35 @@
                 </div>
             </div>
         </div>
-        
+
+        <!-- Time Lord Panel (shown only for "timelord" user) -->
+        <div class="panel panel-timelord" id="timeLordPanel" style="padding: 10px 20px; display: none;">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: nowrap;">
+                <!-- Start Date/Time -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="timeLordStartDate" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">Start Date & Time:</label>
+                    <input type="datetime-local" id="timeLordStartDate" style="padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                </div>
+
+                <!-- End Date/Time -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="timeLordEndDate" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">End Date & Time:</label>
+                    <input type="datetime-local" id="timeLordEndDate" style="padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                </div>
+
+                <!-- Spacer to push recent searches to the right -->
+                <div style="flex: 1;"></div>
+
+                <!-- Recent Searches -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="timeLordRecentSearches" style="font-weight: 600; font-size: 14px; color: #555; white-space: nowrap; margin: 0;">Recent Searches:</label>
+                    <select id="timeLordRecentSearches" style="width: 300px; padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: white;">
+                        <option value="">No recent searches</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="panel panel-playback">
             <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; width: 100%; box-sizing: border-box;">
                 <button type="button" id="playPauseBtn" disabled style="width: 135px; min-width: 135px;">⏸️ Pause</button>
