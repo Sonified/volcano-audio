@@ -151,11 +151,14 @@ function populateRecentSearchesDropdown() {
 }
 
 /**
- * Set default times (last 24 hours)
+ * Set default times (December 6th, 2025 full day in Hawaii time)
+ * Hawaii midnight to midnight = Central 04:00 to 04:00
  */
 function setDefaultTimes() {
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+    // December 6, 2025 at 04:00 Central (midnight Hawaii)
+    const startDate = new Date(2025, 11, 6, 4, 0); // Month is 0-indexed, so 11 = December
+    // December 7, 2025 at 04:00 Central (midnight Hawaii)
+    const endDate = new Date(2025, 11, 7, 4, 0);
 
     // Format for datetime-local input (YYYY-MM-DDTHH:MM)
     const formatForInput = (date) => {
