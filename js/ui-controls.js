@@ -3937,3 +3937,37 @@ export function hideResultsPanel() {
     }
 }
 
+/**
+ * Show time lord panel for time lord user
+ */
+let timeLordPanelInitialized = false;
+export async function showTimeLordPanel() {
+    const timeLordPanel = document.getElementById('timeLordPanel');
+    if (timeLordPanel) {
+        timeLordPanel.style.display = 'block';
+        console.log('⏰ Time Lord panel shown');
+
+        // Initialize time lord panel on first show
+        if (!timeLordPanelInitialized) {
+            timeLordPanelInitialized = true;
+            try {
+                const { initTimeLordPanel } = await import('./time-lord-panel.js');
+                await initTimeLordPanel();
+            } catch (error) {
+                console.error('❌ Error initializing time lord panel:', error);
+            }
+        }
+    }
+}
+
+/**
+ * Hide time lord panel
+ */
+export function hideTimeLordPanel() {
+    const timeLordPanel = document.getElementById('timeLordPanel');
+    if (timeLordPanel) {
+        timeLordPanel.style.display = 'none';
+        console.log('⏰ Time Lord panel hidden');
+    }
+}
+

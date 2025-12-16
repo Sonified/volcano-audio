@@ -1134,6 +1134,21 @@ async function updateParticipantIdDisplay() {
             pageTitle.textContent = 'Volcano Seismic Audification Portal';
         }
     }
+
+    // Check if username is "timelord" - show time lord panel
+    if (participantId && participantId.toLowerCase() === 'timelord') {
+        const { showTimeLordPanel } = await import('./ui-controls.js');
+        await showTimeLordPanel();
+        // Change page title for time lord user
+        document.title = 'Time Lord - Volcano Data Browser';
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) {
+            pageTitle.textContent = 'Time Lord - Volcano Data Browser';
+        }
+    } else {
+        const { hideTimeLordPanel } = await import('./ui-controls.js');
+        hideTimeLordPanel();
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
