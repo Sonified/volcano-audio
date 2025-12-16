@@ -151,16 +151,17 @@ function populateRecentSearchesDropdown() {
 }
 
 /**
- * Set default times (December 6th, 2025 full day in Hawaii time)
- * Hawaii midnight to midnight = Central 04:00 to 04:00
+ * Set default times (December 6th, 2025 full day in UTC)
+ * 00:00 UTC to 00:00 UTC (midnight to midnight UTC)
  */
 function setDefaultTimes() {
-    // December 6, 2025 at 04:00 Central (midnight Hawaii)
-    const startDate = new Date(2025, 11, 6, 4, 0); // Month is 0-indexed, so 11 = December
-    // December 7, 2025 at 04:00 Central (midnight Hawaii)
-    const endDate = new Date(2025, 11, 7, 4, 0);
+    // December 6, 2025 at 00:00 UTC
+    const startDate = new Date(Date.UTC(2025, 11, 6, 0, 0)); // Month is 0-indexed, so 11 = December
+    // December 7, 2025 at 00:00 UTC
+    const endDate = new Date(Date.UTC(2025, 11, 7, 0, 0));
 
     // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+    // Display in user's local timezone
     const formatForInput = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -182,10 +183,33 @@ function setDefaultTimes() {
  */
 function setupEventListeners() {
     const recentSearchesDropdown = document.getElementById('timeLordRecentSearches');
+    const startDateInput = document.getElementById('timeLordStartDate');
+    const endDateInput = document.getElementById('timeLordEndDate');
 
     // Recent search selection
     if (recentSearchesDropdown) {
         recentSearchesDropdown.addEventListener('change', handleRecentSearchSelection);
+    }
+
+    // Re-enable Fetch Data button when times change
+    if (startDateInput) {
+        startDateInput.addEventListener('change', () => {
+            const startBtn = document.getElementById('startBtn');
+            if (startBtn && startBtn.disabled) {
+                startBtn.disabled = false;
+                console.log('🔓 Fetch button re-enabled after time change');
+            }
+        });
+    }
+
+    if (endDateInput) {
+        endDateInput.addEventListener('change', () => {
+            const startBtn = document.getElementById('startBtn');
+            if (startBtn && startBtn.disabled) {
+                startBtn.disabled = false;
+                console.log('🔓 Fetch button re-enabled after time change');
+            }
+        });
     }
 }
 
