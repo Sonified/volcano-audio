@@ -151,14 +151,13 @@ function populateRecentSearchesDropdown() {
 }
 
 /**
- * Set default times (December 6th, 2025 full day in UTC)
- * 00:00 UTC to 00:00 UTC (midnight to midnight UTC)
+ * Set default times (December 6th, 2025 04:00 to December 7th, 2025 04:00 in user's local timezone)
  */
 function setDefaultTimes() {
-    // December 6, 2025 at 00:00 UTC
-    const startDate = new Date(Date.UTC(2025, 11, 6, 0, 0)); // Month is 0-indexed, so 11 = December
-    // December 7, 2025 at 00:00 UTC
-    const endDate = new Date(Date.UTC(2025, 11, 7, 0, 0));
+    // December 6, 2025 at 04:00 LOCAL TIME
+    const startDate = new Date(2025, 11, 6, 4, 0); // Month is 0-indexed, so 11 = December
+    // December 7, 2025 at 04:00 LOCAL TIME
+    const endDate = new Date(2025, 11, 7, 4, 0);
 
     // Format for datetime-local input (YYYY-MM-DDTHH:MM)
     // Display in user's local timezone
