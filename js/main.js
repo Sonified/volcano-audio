@@ -642,33 +642,56 @@ export async function startStreaming(event) {
         }
         
         // Calculate estimated end time
-        // If loading a session from results panel, use the stored fetch timestamp
-        let now;
-        if (window.sessionFetchTimestamp) {
-            now = new Date(window.sessionFetchTimestamp);
-            console.log(`📅 ${logTime()} Using session timestamp: ${window.sessionFetchTimestamp}`);
-            // Clear it after using so next fetch uses current time
-            delete window.sessionFetchTimestamp;
-        } else {
-            now = new Date();
-        }
-
-        const currentMinute = now.getUTCMinutes();
-        const currentSecond = now.getUTCSeconds();
-        const currentPeriodStart = Math.floor(currentMinute / 10) * 10;
-        const minutesSincePeriodStart = currentMinute - currentPeriodStart;
-        const secondsSincePeriodStart = minutesSincePeriodStart * 60 + currentSecond;
-
+        // Check if user is "timelord" and has custom date range
+        let startTime;
         let estimatedEndTime;
-        if (secondsSincePeriodStart >= 135) {
-            estimatedEndTime = new Date(now.getTime());
-            estimatedEndTime.setUTCMinutes(currentPeriodStart, 0, 0);
-        } else {
-            estimatedEndTime = new Date(now.getTime());
-            estimatedEndTime.setUTCMinutes(currentPeriodStart - 10, 0, 0);
+
+        // Use participantId from earlier (already declared above)
+        if (participantId && participantId.toLowerCase() === 'timelord') {
+            // Try to get Time Lord date range
+            const { getTimeLordDateRange } = await import('./time-lord-panel.js');
+            const timeLordRange = getTimeLordDateRange();
+
+            if (timeLordRange) {
+                // Use Time Lord custom dates
+                startTime = timeLordRange.startTime;
+                estimatedEndTime = timeLordRange.endTime;
+                console.log(`⏰ ${logTime()} Using Time Lord date range: ${startTime.toISOString()} to ${estimatedEndTime.toISOString()}`);
+            } else {
+                // No valid Time Lord dates - fall back to default calculation
+                console.warn('⚠️ Time Lord mode active but no valid date range - using default last 24 hours');
+            }
         }
 
-        const startTime = new Date(estimatedEndTime.getTime() - duration * 3600 * 1000);
+        // If not timelord or no valid date range, use default calculation
+        if (!startTime || !estimatedEndTime) {
+            // If loading a session from results panel, use the stored fetch timestamp
+            let now;
+            if (window.sessionFetchTimestamp) {
+                now = new Date(window.sessionFetchTimestamp);
+                console.log(`📅 ${logTime()} Using session timestamp: ${window.sessionFetchTimestamp}`);
+                // Clear it after using so next fetch uses current time
+                delete window.sessionFetchTimestamp;
+            } else {
+                now = new Date();
+            }
+
+            const currentMinute = now.getUTCMinutes();
+            const currentSecond = now.getUTCSeconds();
+            const currentPeriodStart = Math.floor(currentMinute / 10) * 10;
+            const minutesSincePeriodStart = currentMinute - currentPeriodStart;
+            const secondsSincePeriodStart = minutesSincePeriodStart * 60 + currentSecond;
+
+            if (secondsSincePeriodStart >= 135) {
+                estimatedEndTime = new Date(now.getTime());
+                estimatedEndTime.setUTCMinutes(currentPeriodStart, 0, 0);
+            } else {
+                estimatedEndTime = new Date(now.getTime());
+                estimatedEndTime.setUTCMinutes(currentPeriodStart - 10, 0, 0);
+            }
+
+            startTime = new Date(estimatedEndTime.getTime() - duration * 3600 * 1000);
+        }
         
         // Only log in dev/personal modes, not study mode
         if (!isStudyMode()) {
@@ -1038,13 +1061,33 @@ export async function startStreaming(event) {
             
             // Data fetch completed successfully - mark this volcano as having data
             State.setVolcanoWithData(volcano);
-            
+
             // Re-enable auto-resize now that fetch is complete
             const { enableAutoResize } = await import('./status-auto-resize.js');
             enableAutoResize();
-            
+
             if (!isStudyMode()) {
                 console.log(`✅ Data fetch complete - marked ${volcano} as having data`);
+            }
+
+            // Record Time Lord search if user is timelord
+            if (participantId && participantId.toLowerCase() === 'timelord') {
+                const { recordTimeLordSearch } = await import('./time-lord-panel.js');
+                // Convert Date objects to datetime-local format strings
+                const formatForInput = (date) => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    return `${year}-${month}-${day}T${hours}:${minutes}`;
+                };
+                recordTimeLordSearch(
+                    formatForInput(startTime),
+                    formatForInput(estimatedEndTime),
+                    volcano,
+                    station
+                );
             }
         } catch (fetchError) {
             // Don't set volcanoWithData if fetch failed
@@ -1133,6 +1176,21 @@ async function updateParticipantIdDisplay() {
         if (pageTitle) {
             pageTitle.textContent = 'Volcano Seismic Audification Portal';
         }
+    }
+
+    // Check if username is "timelord" - show time lord panel
+    if (participantId && participantId.toLowerCase() === 'timelord') {
+        const { showTimeLordPanel } = await import('./ui-controls.js');
+        await showTimeLordPanel();
+        // Change page title for time lord user
+        document.title = 'Time Lord - Volcano Data Browser';
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) {
+            pageTitle.textContent = 'Time Lord - Volcano Data Browser';
+        }
+    } else {
+        const { hideTimeLordPanel } = await import('./ui-controls.js');
+        hideTimeLordPanel();
     }
 }
 

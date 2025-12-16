@@ -30,3 +30,8 @@ claude_instructions/
 # Downloaded data with PII - NEVER COMMIT
 Qualtrics/Downloaded_Data/
 Qualtrics/analysis/
+final_analysis/video_creation/
+
+# Test files
+test_iris_speed.py
+js/test-iris-direct.js

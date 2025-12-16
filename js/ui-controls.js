@@ -2758,6 +2758,15 @@ export async function submitParticipantSetup() {
         }
     }
 
+    // 🔍 Check if username is "timelord" - show time lord panel
+    if (participantId && participantId.toLowerCase() === 'timelord') {
+        console.log('⏰ Time Lord user detected - showing time lord panel');
+        showTimeLordPanel();
+    } else {
+        // Hide time lord panel if it exists and user is not "timelord"
+        hideTimeLordPanel();
+    }
+
     // 🔥 REMOVED: Don't manually hide modal or fade overlay
     // Let the button handler and ModalManager do their job!
     // The workflow is waiting for the modal to properly close through ModalManager.
@@ -3934,6 +3943,40 @@ export function hideResultsPanel() {
     if (resultsPanel) {
         resultsPanel.style.display = 'none';
         console.log('📊 Results panel hidden');
+    }
+}
+
+/**
+ * Show time lord panel for time lord user
+ */
+let timeLordPanelInitialized = false;
+export async function showTimeLordPanel() {
+    const timeLordPanel = document.getElementById('timeLordPanel');
+    if (timeLordPanel) {
+        timeLordPanel.style.display = 'block';
+        console.log('⏰ Time Lord panel shown');
+
+        // Initialize time lord panel on first show
+        if (!timeLordPanelInitialized) {
+            timeLordPanelInitialized = true;
+            try {
+                const { initTimeLordPanel } = await import('./time-lord-panel.js');
+                await initTimeLordPanel();
+            } catch (error) {
+                console.error('❌ Error initializing time lord panel:', error);
+            }
+        }
+    }
+}
+
+/**
+ * Hide time lord panel
+ */
+export function hideTimeLordPanel() {
+    const timeLordPanel = document.getElementById('timeLordPanel');
+    if (timeLordPanel) {
+        timeLordPanel.style.display = 'none';
+        console.log('⏰ Time Lord panel hidden');
     }
 }
 
