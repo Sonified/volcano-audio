@@ -2758,6 +2758,15 @@ export async function submitParticipantSetup() {
         }
     }
 
+    // 🔍 Check if username is "timelord" - show time lord panel
+    if (participantId && participantId.toLowerCase() === 'timelord') {
+        console.log('⏰ Time Lord user detected - showing time lord panel');
+        showTimeLordPanel();
+    } else {
+        // Hide time lord panel if it exists and user is not "timelord"
+        hideTimeLordPanel();
+    }
+
     // 🔥 REMOVED: Don't manually hide modal or fade overlay
     // Let the button handler and ModalManager do their job!
     // The workflow is waiting for the modal to properly close through ModalManager.
