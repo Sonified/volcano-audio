@@ -1352,10 +1352,8 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
 }
 
 // ===== MODE 2: RAILWAY BACKEND (ORIGINAL PATH) =====
-// ⚠️ DEPRECATED CODE - DO NOT UPDATE EVER. DO NOT TOUCH THIS CODE.
-// This code path is deprecated and should not be modified.
-// 🚫 COMMENTED OUT - Railway fetch path disabled
-/* export async function fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize) {
+// Re-enabled for inactive stations (non-default stations that need IRIS data)
+export async function fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize) {
     const formatTime = (date) => {
         return date.toISOString().slice(0, 19);
     };
@@ -1747,7 +1745,7 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
             }
         }
     });
-    
+
     console.log('✅ Streaming complete from Railway backend');
-} */
+}
 

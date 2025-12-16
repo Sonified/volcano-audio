@@ -1022,18 +1022,18 @@ export async function startStreaming(event) {
         
         try {
         if (forceIrisFetch) {
-            console.log(`🌐 ${logTime()} Force IRIS Fetch ENABLED - Railway backend DISABLED`);
-            throw new Error('Railway backend is disabled');
-            // await fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize);
+            console.log(`🚂 ${logTime()} Force IRIS Fetch via Railway backend`);
+            const { fetchFromRailway } = await import('./data-fetcher.js');
+            await fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize);
         } else if (isActiveStation) {
             if (!isStudyMode()) {
                 console.log(`🌐 ${logTime()} Using CDN direct (active station)`);
             }
             await fetchFromR2Worker(stationData, startTime, estimatedEndTime, duration, highpassFreq, realisticChunkPromise, firstChunkStart);
         } else {
-            console.log(`🚂 ${logTime()} Railway backend disabled - inactive stations not supported`);
-            throw new Error('Railway backend is disabled - inactive stations not supported');
-            // await fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize);
+            console.log(`🚂 ${logTime()} Using Railway backend for inactive station (fetches from IRIS)`);
+            const { fetchFromRailway } = await import('./data-fetcher.js');
+            await fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize);
             }
             
             // Data fetch completed successfully - mark this volcano as having data
@@ -1907,7 +1907,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         e.target.blur(); // Blur so spacebar can toggle play/pause
     });
     document.getElementById('station').addEventListener('change', (e) => {
-        enableFetchButton();
+        // Force-enable fetch button when station changes (even if on same volcano)
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.classList.remove('streaming');
+            startBtn.title = '';
+            console.log('🔓 Fetch button re-enabled after station change');
+        }
         e.target.blur(); // Blur so spacebar can toggle play/pause
     });
     document.getElementById('duration').addEventListener('change', (e) => {
