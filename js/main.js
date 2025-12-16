@@ -1965,7 +1965,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         e.target.blur(); // Blur so spacebar can toggle play/pause
     });
     document.getElementById('station').addEventListener('change', (e) => {
-        enableFetchButton();
+        // Force-enable fetch button when station changes (even if on same volcano)
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.classList.remove('streaming');
+            startBtn.title = '';
+            console.log('🔓 Fetch button re-enabled after station change');
+        }
         e.target.blur(); // Blur so spacebar can toggle play/pause
     });
     document.getElementById('duration').addEventListener('change', (e) => {
