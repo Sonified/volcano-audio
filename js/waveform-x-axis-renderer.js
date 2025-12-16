@@ -14,6 +14,30 @@ import { redrawAllCanvasFeatureBoxes } from './spectrogram-renderer.js';
 // Debug flag for axis drawing logs (set to true to enable detailed logging)
 const DEBUG_AXIS = false;
 
+// Hawaii time offset (UTC-10)
+const HAWAII_OFFSET_MS = -10 * 60 * 60 * 1000;
+
+/**
+ * Check if we're in Time Lord mode (username is "timelord")
+ */
+function isTimeLordMode() {
+    const participantId = localStorage.getItem('participantId');
+    return participantId && participantId.toLowerCase() === 'timelord';
+}
+
+/**
+ * Get display time - Hawaii time for Time Lord mode, local browser time otherwise
+ */
+function getDisplayTime(utcTime) {
+    if (isTimeLordMode()) {
+        // Hawaii time: offset UTC by -10 hours, then use UTC methods for display
+        return new Date(utcTime.getTime() + HAWAII_OFFSET_MS);
+    } else {
+        // Browser local time
+        return new Date(utcTime);
+    }
+}
+
 // 🏛️ Zoom transition animation state (for smooth tick interpolation)
 let zoomTransitionInProgress = false;
 let zoomTransitionStartTime = null;
@@ -196,14 +220,16 @@ export function drawWaveformXAxis() {
         if (tick.isDayCrossing) {
             // Show date in 11/12 format (mm/dd)
             const localDate = tick.localTime;
-            const month = localDate.getMonth() + 1; // 0-indexed
-            const day = localDate.getDate();
+            // Use UTC methods for Hawaii time (offset dates), local methods otherwise
+            const month = tick.isHawaiiTime ? localDate.getUTCMonth() + 1 : localDate.getMonth() + 1;
+            const day = tick.isHawaiiTime ? localDate.getUTCDate() : localDate.getDate();
             label = `${month}/${day}`;
         } else {
             // Show time in international format (1:00 through 13:00 and 24:00)
             const localDate = tick.localTime;
-            const hours = localDate.getHours();
-            const minutes = localDate.getMinutes();
+            // Use UTC methods for Hawaii time (offset dates), local methods otherwise
+            const hours = tick.isHawaiiTime ? localDate.getUTCHours() : localDate.getHours();
+            const minutes = tick.isHawaiiTime ? localDate.getUTCMinutes() : localDate.getMinutes();
             
             if (hours === 0 && minutes === 0) {
                 label = '24:00'; // Midnight shown as 24:00
@@ -465,10 +491,12 @@ function calculateHourlyTicks(startUTC, endUTC) {
         // Check if this UTC time falls within our data range
         // Compare using getTime() for accurate comparison
         if (tickUTCForPosition.getTime() >= startUTC.getTime() && tickUTCForPosition.getTime() <= endUTC.getTime()) {
+            const isHawaiiTime = isTimeLordMode();
             ticks.push({
                 utcTime: tickUTCForPosition, // UTC time for positioning
-                localTime: new Date(currentTickLocal), // Local time for display
-                isDayCrossing: isDayCrossing
+                localTime: getDisplayTime(tickUTCForPosition), // Display time (Hawaii for time lord, browser local otherwise)
+                isDayCrossing: isDayCrossing,
+                isHawaiiTime: isHawaiiTime
             });
         } else {
             // console.log(`🕐 Tick filtered out: ${currentTickLocal.toLocaleString()} (UTC: ${tickUTCForPosition.toISOString()}) not in range`);
@@ -546,10 +574,12 @@ function calculateFourHourTicks(startUTC, endUTC) {
         
         // Check if this UTC time falls within our data range
         if (tickUTCForPosition.getTime() >= startUTC.getTime() && tickUTCForPosition.getTime() <= endUTC.getTime()) {
+            const isHawaiiTime = isTimeLordMode();
             ticks.push({
                 utcTime: tickUTCForPosition, // UTC time for positioning
-                localTime: new Date(currentTickLocal), // Local time for display
-                isDayCrossing: isDayCrossing
+                localTime: getDisplayTime(tickUTCForPosition), // Display time (Hawaii for time lord, browser local otherwise)
+                isDayCrossing: isDayCrossing,
+                isHawaiiTime: isHawaiiTime
             });
         }
         
@@ -625,10 +655,12 @@ function calculateTwoHourTicks(startUTC, endUTC) {
         
         // Check if this UTC time falls within our data range
         if (tickUTCForPosition.getTime() >= startUTC.getTime() && tickUTCForPosition.getTime() <= endUTC.getTime()) {
+            const isHawaiiTime = isTimeLordMode();
             ticks.push({
                 utcTime: tickUTCForPosition, // UTC time for positioning
-                localTime: new Date(currentTickLocal), // Local time for display
-                isDayCrossing: isDayCrossing
+                localTime: getDisplayTime(tickUTCForPosition), // Display time (Hawaii for time lord, browser local otherwise)
+                isDayCrossing: isDayCrossing,
+                isHawaiiTime: isHawaiiTime
             });
         }
         
@@ -708,10 +740,12 @@ function calculateFiveMinuteTicks(startUTC, endUTC) {
         
         // Check if this UTC time falls within our data range
         if (tickUTCForPosition.getTime() >= startUTC.getTime() && tickUTCForPosition.getTime() <= endUTC.getTime()) {
+            const isHawaiiTime = isTimeLordMode();
             ticks.push({
                 utcTime: tickUTCForPosition, // UTC time for positioning
-                localTime: new Date(currentTickLocal), // Local time for display
-                isDayCrossing: isDayCrossing
+                localTime: getDisplayTime(tickUTCForPosition), // Display time (Hawaii for time lord, browser local otherwise)
+                isDayCrossing: isDayCrossing,
+                isHawaiiTime: isHawaiiTime
             });
         }
         
@@ -791,10 +825,12 @@ function calculateThirtyMinuteTicks(startUTC, endUTC) {
         
         // Check if this UTC time falls within our data range
         if (tickUTCForPosition.getTime() >= startUTC.getTime() && tickUTCForPosition.getTime() <= endUTC.getTime()) {
+            const isHawaiiTime = isTimeLordMode();
             ticks.push({
                 utcTime: tickUTCForPosition, // UTC time for positioning
-                localTime: new Date(currentTickLocal), // Local time for display
-                isDayCrossing: isDayCrossing
+                localTime: getDisplayTime(tickUTCForPosition), // Display time (Hawaii for time lord, browser local otherwise)
+                isDayCrossing: isDayCrossing,
+                isHawaiiTime: isHawaiiTime
             });
         }
         
