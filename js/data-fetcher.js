@@ -1576,7 +1576,7 @@ export async function fetchFromRailway(stationData, startTime, duration, highpas
     // 🏛️ Initialize zoom state with total sample count (Railway path)
     zoomState.initialize(totalRailwaySamples);
     
-    const railwayBufferStatusHandler = (event) => {
+    const railwayBufferStatusHandler = async (event) => {
         if (event.data.type === 'buffer-status') {
             const { samplesInBuffer, totalSamplesWritten } = event.data;
             console.log(`📊 [Railway] Worklet buffer status: ${totalSamplesWritten.toLocaleString()} written, ${samplesInBuffer.toLocaleString()} buffered (expecting ${totalRailwaySamples.toLocaleString()} total)`);
@@ -1614,9 +1614,16 @@ export async function fetchFromRailway(stationData, startTime, duration, highpas
                         enabled: true  // Always enabled
                     });
                 }
-                
+
                 // Update playback duration
                 updatePlaybackDuration();
+
+                // 🎨 Render complete spectrogram now that all data is ready
+                console.log(`🎨 [Railway] Triggering complete spectrogram rendering...`);
+                const { startCompleteVisualization } = await import('./spectrogram-complete-renderer.js');
+                startCompleteVisualization().catch(err => {
+                    console.error('❌ Error rendering complete spectrogram:', err);
+                });
                 
                 // Enable volume slider if tutorial is in progress (speed gets enabled during speed tutorial step)
                 (async () => {
