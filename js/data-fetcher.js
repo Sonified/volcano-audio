@@ -1355,7 +1355,7 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
 // ⚠️ DEPRECATED CODE - DO NOT UPDATE EVER. DO NOT TOUCH THIS CODE.
 // This code path is deprecated and should not be modified.
 // 🚫 COMMENTED OUT - Railway fetch path disabled
-/* export async function fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize) {
+export async function fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize) {
     const formatTime = (date) => {
         return date.toISOString().slice(0, 19);
     };
@@ -1749,5 +1749,5 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
     });
     
     console.log('✅ Streaming complete from Railway backend');
-} */
+}
 
