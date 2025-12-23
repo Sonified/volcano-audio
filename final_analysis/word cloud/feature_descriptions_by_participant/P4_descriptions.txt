@@ -1,0 +1,15 @@
+fairly broadband
+transition to slightly higher energy, more pronounced clicking noise, hard to pinpoint duration
+short duration, mostly high frequency but not all the way to instrument limit
+similar, but duration sounds a bit longer and louder in audio
+similar, but extends to slightly higher frequency
+clearly audible click, but nothing apparent in spectrogram
+audible "windy" sound, less apparent in spectrogram
+transition during/after which relatively rapid irregular clicks start occurring, visible as faint vertical lines
+single click, short onset and duration
+high pitch semi-continuous squeak-like sounds with time-varying frequencies
+short onset and duration, click or thud sound
+gradual increase then decrease in static-like noise, in some cases distinct events apparent, including one clear earthquake,
+repeating whooshing sounds, semi-regular intervals
+series of distinct short clicks followed after varying delays by more sustained whooshing sounds
+series of rapid subtle clicks
