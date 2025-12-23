@@ -47,9 +47,9 @@
 
         h3 {
             color: #34495e;
-            font-size: 1.4em;
-            margin-top: 22px;
-            margin-bottom: 10px;
+            font-size: 1.6em;
+            margin-top: 35px;
+            margin-bottom: 12px;
         }
 
         h4 {
@@ -194,7 +194,6 @@
         .footer {
             margin-top: 30px;
             padding-top: 15px;
-            border-top: 2px solid #ecf0f1;
             color: #7f8c8d;
             font-size: 0.9em;
             text-align: center;
@@ -205,6 +204,10 @@
             padding: 12px;
             margin: 15px 0;
             border-radius: 5px;
+        }
+
+        .toc h3 {
+            margin-top: 0;
         }
 
         .toc ul {
@@ -239,31 +242,39 @@
 </head>
 <body>
     <div class="container">
-        <h1>🌋 Volcano Audification Pilot Study: Initial Results</h1>
+        <h1>🌋 Volcano Perceptualization Pilot: Initial Results</h1>
         <p class="subtitle">Browser-based volcano listening study - N=6, 17 complete sessions</p>
-        <p class="updated"><strong>Last Updated:</strong> December 12, 2025</p>
 
         <div class="toc">
             <h3>Quick Navigation</h3>
             <ul>
                 <li><a href="#overview">Study Overview</a></li>
+                <li><a href="#experimental-design">Experimental Design</a></li>
                 <li><a href="#findings">Key Findings</a></li>
-                <li><a href="#what-this-means">What This Means</a></li>
+                <li><a href="#discussion">Discussion</a></li>
                 <li><a href="#p4-story">The P4 Story</a></li>
             </ul>
         </div>
 
-        <hr>
-
         <h2 id="overview">Study Overview</h2>
 
-        <p><strong>What we did:</strong> Developed a web-based platform that transforms volcanic seismic data into audible sound. Participants (N=6) listened to 24 hours of volcanic data, marked interesting features, and completed pre/post mood surveys plus awe and nature connectedness scales.</p>
+        <p><strong>What we did:</strong> Developed a web-based platform that transforms near-real-time volcanic seismic data into audible sound. Participants (N=6) listened to 24 hours of volcanic data, marked interesting features, and completed pre/post mood surveys plus awe and nature connectedness scales.</p>
 
-        <h3>Study Design</h3>
+        <p><strong>Hypotheses:</strong></p>
+        <ul>
+            <li><strong>H1:</strong> Audification will reveal seismic features overlooked through visual analysis.</li>
+            <li><strong>H2:</strong> Listening to volcanic data will improve affect and sense of connection to nature.</li>
+        </ul>
+
+        <p><strong>Study period:</strong> November-December 2025, conducted over three weeks. This study received IRB approval through the University of Oregon.</p>
+
+        <p><strong>Volcanoes included:</strong> Great Sitkin, Shishaldin, Spurr (Alaska); Kilauea, Mauna Loa (Hawaii)</p>
+
+        <h2 id="experimental-design">Experimental Design</h2>
         <ul>
             <li><strong>N = 6</strong> real participants (after excluding test accounts)</li>
             <li><strong>17 complete sessions</strong> across 3 weeks (all with Pre+Post mood data)</li>
-            <li><strong>Data source:</strong> USGS volcanic seismic station data (Nov-Dec 2025)</li>
+            <li><strong>Data source:</strong> USGS volcanic seismic station data from 5 active volcanoes</li>
             <li><strong>Measures:</strong>
                 <ul>
                     <li><strong>Pre/Post mood</strong> (6 items, 1-5 scale) - administered <strong>immediately before and after each session</strong></li>
@@ -274,19 +285,12 @@
             </li>
         </ul>
 
-        <div class="info">
-            <h4>Methodological Note on Timing</h4>
-            <p><strong>Mood and AWE data</strong> (measured directly before/after each intervention)</p>
-            <p><strong>CNS data</strong> = qualitatively noisier, trending lower in week 3</p>
+        <div style="text-align: center; margin: 25px 0;">
+            <img src="interface_screenshot.jpg" alt="Volcano audio interface showing waveform and spectrogram with participant annotations" style="max-width: 100%; height: auto; border: 1px solid #ecf0f1; border-radius: 5px;">
+            <p style="font-size: 0.9em; color: #7f8c8d; margin-top: 10px;"><em>Study platform interface showing 24-hour volcanic audio data with participant-marked features and annotations</em></p>
         </div>
-
-        <hr>
 
         <h2 id="findings">Key Findings</h2>
-
-        <div class="success">
-            <p><strong>Measurement quality:</strong> Pre/Post mood surveys were administered <strong>immediately before and after each session</strong>, providing high-quality data on the intervention's direct impact. These are the most reliable measures in the study. Statistical significance tested using <strong>paired t-tests</strong>.</p>
-        </div>
 
         <table>
             <thead>
@@ -351,11 +355,13 @@
             </tbody>
         </table>
 
-        <h3>Outcomes</h3>
-
-        <p>Volcano sonification significantly enhanced focus (p=0.0041, Δ=+0.41) - a clear cognitive benefit measured immediately before and after each session. This represents increased concentration and attention during the listening experience.</p>
+        <p>Volcano sonification significantly enhanced focus (p=0.0041, Δ=+0.41), a clear cognitive benefit measured immediately before and after each session. This represents increased concentration and attention during the listening experience.</p>
 
         <p>Calm also showed a strong positive trend approaching significance (p=0.096, Δ=+0.29), suggesting the platform promotes relaxation alongside focus. Connected to nature improved (+0.24) and anxiety decreased (-0.18), though these changes were not statistically significant. The combination of increased focus with improved calm creates a "relaxed focus" state - enhanced concentration without tension or anxiety.</p>
+
+        <div class="info">
+            <p><strong>Measurement notes:</strong> Pre/Post mood surveys were administered <strong>immediately before and after each session</strong>, providing high-quality data on the intervention's direct impact. These are the most reliable measures in the study. Statistical significance tested using <strong>paired t-tests</strong>.</p>
+        </div>
 
         <h3>Pattern Recognition: Participants Detected Volcanic Phenomena</h3>
 
@@ -371,6 +377,16 @@
             </thead>
             <tbody>
                 <tr>
+                    <td><strong>Volcanic tremor</strong></td>
+                    <td>41</td>
+                    <td>"Eruptive tremor gradually increases in frequency", "Jingly tremor", "Shuffling banded tremor"</td>
+                </tr>
+                <tr>
+                    <td><strong>Rich metaphors</strong></td>
+                    <td>12</td>
+                    <td>"pebbles moving underwater", "crackling of fire wood", "ocean waves, repetitive amplitude"</td>
+                </tr>
+                <tr>
                     <td><strong>Possible earthquakes</strong></td>
                     <td>11</td>
                     <td>"local earthquake", "strong local earthquake", "is this a quake from far away or from the volcano?"</td>
@@ -380,22 +396,8 @@
                     <td>8</td>
                     <td>"frequency gliding", "overtone (?) of frequency gliding"</td>
                 </tr>
-                <tr>
-                    <td><strong>Volcanic tremor</strong></td>
-                    <td>Multiple</td>
-                    <td>"I don't 'see' this feature, but I hear a continuous rumbling that's not always there"</td>
-                </tr>
-                <tr>
-                    <td><strong>Rich metaphors</strong></td>
-                    <td>12</td>
-                    <td>"pebbles moving underwater", "crackling of fire wood", "ocean waves, repetitive amplitude"</td>
-                </tr>
             </tbody>
         </table>
-
-        <div class="highlight">
-            <p><strong>Key observation:</strong> P3 identified tremor through sound despite not seeing it visually: <em>"I don't 'see' this feature, but I hear a continuous rumbling that's not always there."</em> This validates auditory perception as complementary to visual analysis.</p>
-        </div>
 
         <p><strong>Annotation quality:</strong></p>
         <ul>
@@ -403,11 +405,12 @@
             <li>This exceeds typical citizen science annotation rates</li>
         </ul>
 
-        <h3>Low Emotional Awe, High Cognitive Engagement</h3>
-
-        <div class="success">
-            <p><strong>Measurement quality:</strong> AWE-SF administered <strong>immediately after each session</strong>, providing high-quality data on emotional response during the intervention.</p>
+        <div style="text-align: center; margin: 25px 0;">
+            <img src="word cloud/feature_wordcloud_volcano_horizontal_volcano.jpg" alt="Word cloud of participant feature annotations" style="max-width: 100%; height: auto; border: 1px solid #ecf0f1; border-radius: 5px;">
+            <p style="font-size: 0.9em; color: #7f8c8d; margin-top: 10px;"><em>Word cloud visualization of terms used in participant feature annotations</em></p>
         </div>
+
+        <h3>AWE-SF: Low Emotional Awe, High Cognitive Engagement</h3>
 
         <table>
             <thead>
@@ -458,11 +461,11 @@
 
         <p><strong>Key finding:</strong> Participants felt <strong>intellectually challenged</strong> (Accommodation 4.15) but experienced <strong>minimal emotional awe</strong> (Overall 2.75). They were thinking, not feeling.</p>
 
-        <h3>Nature Connectedness (CNS): Mixed Results</h3>
-
-        <div class="warning">
-            <p><strong>Measurement limitations:</strong> CNS data is <strong>qualitatively noisier</strong> than the immediate pre/post mood measures and shows a trending lower pattern in week 3. Interpret with caution.</p>
+        <div class="info">
+            <p><strong>Measurement notes:</strong> AWE-SF administered <strong>immediately after each session</strong>, providing high-quality data on emotional response during the intervention.</p>
         </div>
+
+        <h3>Nature Connectedness (CNS): Mixed Results</h3>
 
         <p><strong>Participants with complete Pre + Post CNS data: 4 of 6</strong> (P1, P2, P3, P4)</p>
 
@@ -519,87 +522,21 @@
         </table>
 
         <div class="info">
+            <p><strong>Measurement limitations:</strong> CNS data is <strong>qualitatively noisier</strong> than the immediate pre/post mood measures and shows a trending lower pattern in week 3. Interpret with caution.</p>
             <p><strong>Important:</strong> CNS should be interpreted cautiously given timing issues. Mood and AWE data (measured immediately before/after sessions) are more reliable indicators of intervention impact.</p>
         </div>
 
-        <hr>
+        <h2 id="discussion">Discussion</h2>
 
-        <h2 id="what-this-means">What This Means</h2>
-
-        <h3>Key Findings Summary</h3>
-
-        <div class="success">
-            <h4>Significant effects (p &lt; 0.05):</h4>
-            <ol>
-                <li><strong>Focus increased</strong> (p=0.0041, Δ=+0.41) - clear cognitive benefit measured immediately before/after each session</li>
-            </ol>
-        </div>
-
-        <div class="warning">
-            <h4>Trending effects (p &lt; 0.10, require larger N for significance):</h4>
-            <ol start="2">
-                <li><strong>Calm increased</strong> (p=0.096, Δ=+0.29) - approaching significance, positive relaxation trend</li>
-                <li><strong>Energized decreased</strong> (p=0.083, Δ=-0.35) - negative trend, may reflect relaxation vs. stimulation trade-off</li>
-            </ol>
-        </div>
-
-        <div class="info">
-            <h4>Positive trends (not significant, consistent direction):</h4>
-            <ol start="4">
-                <li><strong>Connected improved</strong> (Δ=+0.24) - positive trend in feeling connected</li>
-                <li><strong>Anxiety decreased</strong> (Δ=-0.18) - positive trend in reduced nervousness</li>
-                <li><strong>Wonder stable</strong> (Δ=+0.06) - minimal change</li>
-            </ol>
-        </div>
-
-        <h4>Qualitative findings (high-quality behavioral data):</h4>
-        <ol start="7">
-            <li><strong>Pattern recognition demonstrated:</strong> Untrained participants identified possible earthquakes, frequency glides, and volcanic tremor through sound alone</li>
-            <li><strong>High engagement:</strong> 283 features annotated, 36% with substantive scientific notes - exceeds typical citizen science rates</li>
+        <h4>Qualitative insights:</h4>
+        <ol>
+            <li><strong>Pattern recognition demonstrated:</strong> Untrained participants identified possible earthquakes, frequency glides, and volcanic tremor through sound alone.</li>
+            <li><strong>High engagement:</strong> 283 features annotated, 36% with substantive scientific notes - exceeds typical citizen science rates.</li>
         </ol>
 
-        <h4>Awe and nature connectedness:</h4>
-        <ol start="9">
-            <li><strong>Low emotional awe</strong> (2.75/7, measured post-session) - BUT high cognitive engagement (Accommodation 4.15/7)
-                <ul>
-                    <li>Platform creates intellectual challenge, not emotional overwhelm</li>
-                </ul>
-            </li>
-            <li><strong>CNS inconclusive but trending lower in week 3</strong></li>
-        </ol>
+        <h4 id="p4-story">Individual Variation: The Story of Participant 4</h4>
 
-        <h3>Areas Requiring Larger Sample</h3>
-        <p>Several positive trends require N&gt;50 to reach statistical significance:</p>
-        <ul>
-            <li><strong>Calm</strong> (p=0.096) - very close to significance, clear positive trend</li>
-            <li><strong>Connected</strong> (positive direction, moderate effect size)</li>
-            <li><strong>Anxiety reduction</strong> (consistent with "relaxed focus" pattern)</li>
-        </ul>
-
-        <p>Current N=6 (17 sessions) provides adequate power for large effects (like Focus) but is underpowered for medium effects.</p>
-
-        <h3>Data Quality Hierarchy</h3>
-
-        <div class="success">
-            <h4>Most Reliable</h4>
-            <ol>
-                <li><strong>Mood changes</strong> (pre/post each session) → <span class="emoji">✅</span> Focus significantly increased</li>
-                <li><strong>AWE-SF</strong> (immediately post-session) → <span class="emoji">✅</span> Low awe, high cognitive engagement</li>
-                <li><strong>Feature annotations</strong> (during sessions) → <span class="emoji">✅</span> Pattern recognition demonstrated</li>
-            </ol>
-        </div>
-
-        <div class="warning">
-            <h4>Less Reliable</h4>
-            <ol start="4">
-                <li><strong>CNS</strong> (trending lower in week 3) → <span class="emoji">❓</span> Mixed, treat with caution</li>
-            </ol>
-        </div>
-
-
-        <h2 id="p4-story">Individual Variation: The P4 Story</h2>
-
-        <p>P4 is the ideal outcome:</p>
+        <p>Participant 4 consistently displayed positive shifts from engagement with audified volcanic data:</p>
         <ul>
             <li><strong>CNS increased</strong> (+2 points, only participant)</li>
             <li><strong>High quality annotations:</strong> 100% of features have detailed notes
@@ -612,9 +549,7 @@
             <li><strong>Highest AWE-SF among multi-session participants</strong></li>
         </ul>
 
-        <p>P4 demonstrates it's possible to achieve both cognitive engagement AND positive outcomes. N=6 reveals this variation that would be lost in larger aggregate studies.</p>
-
-        <hr>
+        <p>This participant demonstrates one pattern of response combining cognitive engagement with positive affective outcomes. N=6 reveals individual variation that would be lost in larger aggregate studies.</p>
 
         <h2>Statistical Summary</h2>
 
@@ -651,6 +586,10 @@
                     <td>+0.29 (p=0.096)</td>
                 </tr>
                 <tr>
+                    <td>Connected to nature trending positive</td>
+                    <td>+0.24 (n.s.)</td>
+                </tr>
+                <tr>
                     <td>Overall awe (AWE-SF)</td>
                     <td>2.75/7 (low)</td>
                 </tr>
@@ -658,20 +597,10 @@
                     <td>Cognitive challenge (Accommodation)</td>
                     <td>4.15/7 (above neutral)</td>
                 </tr>
-                <tr>
-                    <td>Connected to nature increase</td>
-                    <td>+0.24 (n.s.)</td>
-                </tr>
             </tbody>
         </table>
 
-        <hr>
-
-
-
-
         <div class="footer">
-            <p><strong>Last updated:</strong> December 12, 2025</p>
         </div>
     </div>
 </body>
