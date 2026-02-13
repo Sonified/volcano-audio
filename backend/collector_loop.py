@@ -5701,6 +5701,48 @@ def trigger_collection():
         'note': 'Check /status to monitor progress'
     })
 
+@app.route('/purge-cache', methods=['POST'])
+def purge_cache():
+    """
+    Purge Cloudflare CDN cache for cdn.now.audio.
+    Useful after backfills when Cloudflare has cached 404 responses.
+
+    Requires CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN env vars on Railway.
+    """
+    import requests as req
+
+    zone_id = os.getenv('CLOUDFLARE_ZONE_ID')
+    api_token = os.getenv('CLOUDFLARE_API_TOKEN')
+
+    if not zone_id or not api_token:
+        return jsonify({
+            'error': 'Missing CLOUDFLARE_ZONE_ID or CLOUDFLARE_API_TOKEN env vars'
+        }), 500
+
+    try:
+        resp = req.post(
+            f'https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache',
+            headers={
+                'Authorization': f'Bearer {api_token}',
+                'Content-Type': 'application/json'
+            },
+            json={'purge_everything': True}
+        )
+        result = resp.json()
+
+        if result.get('success'):
+            print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] ✅ CDN cache purged")
+            return jsonify({
+                'success': True,
+                'message': 'CDN cache purged successfully',
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+        else:
+            error_msg = result.get('errors', [{}])[0].get('message', 'Unknown error')
+            return jsonify({'success': False, 'error': error_msg}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def wait_until_next_run():
     """
     Wait until the next scheduled run time.
