@@ -1,13 +1,9 @@
-FROM python:3.11.11-slim
+FROM python:3.11.11
 
 WORKDIR /app
 
-# Install system dependencies needed by ObsPy/scipy
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    gfortran \
-    libopenblas-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Upgrade pip and ensure setuptools is current
+RUN pip install --upgrade pip setuptools
 
 # Copy and install Python dependencies
 COPY requirements.txt .
