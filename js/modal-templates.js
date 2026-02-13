@@ -43,7 +43,7 @@ export function createEndModal() {
     modal.innerHTML = `
         <div class="modal-content" style="animation: fadeInModal 0.3s ease-in; max-width: 650px; border: 2px solid #8B4513; box-shadow: 0 0 20px rgba(139, 69, 19, 0.15), 0 10px 40px rgba(0, 0, 0, 0.3); background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139, 69, 19, 0.03) 2px, rgba(139, 69, 19, 0.03) 4px), repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(139, 69, 19, 0.03) 2px, rgba(139, 69, 19, 0.03) 4px), linear-gradient(to bottom, rgba(255, 250, 240, 0.05) 0%, rgba(255, 255, 255, 1) 100%), white; position: relative; overflow: hidden;">
             <!-- Watermark -->
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 200px; opacity: 0.04; pointer-events: none; mix-blend-mode: multiply; z-index: 0;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 200px; opacity: 0.04; pointer-events: none; z-index: 0;">
                 🌋
             </div>
             
@@ -330,6 +330,33 @@ export function createMissingStudyIdModal() {
                 </div>
                 <div style="display: flex; gap: 15px; justify-content: center;">
                     <button type="button" class="modal-submit" style="padding: 12px 24px; font-size: 16px; font-weight: 600; background: #007bff; border: 2px solid #007bff; color: white; border-radius: 6px; cursor: pointer; transition: all 0.2s;">Enter Study ID</button>
+                </div>
+            </div>
+        </div>
+    `;
+    return modal;
+}
+
+export function createPortfolioWelcomeModal() {
+    const modal = document.createElement('div');
+    modal.id = 'portfolioWelcomeModal';
+    modal.className = 'modal-window';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 531px;">
+            <div class="modal-header">
+                <h3 class="modal-title">🌋 Welcome!</h3>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 25px; color: #333; font-size: 18px; line-height: 1.6;">
+                    This interface will allow you to listen to seismic data from active volcanoes and identify interesting features.
+                </p>
+                <p style="margin-bottom: 30px; color: #333; font-size: 18px; line-height: 1.6;">
+                    Would you like to start with a tutorial?
+                </p>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <button type="button" id="portfolioBeginTutorial" class="modal-submit" style="flex: 1; max-width: 200px; background: #28a745;" onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">Begin Tutorial</button>
+                    <button type="button" id="portfolioSkipTutorial" class="modal-submit" style="flex: 1; max-width: 200px; background: #6c757d;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">Skip</button>
                 </div>
             </div>
         </div>
@@ -1070,6 +1097,7 @@ export async function initializeModals() {
     }
     
     const welcomeModal = createWelcomeModal();
+    const portfolioWelcomeModal = createPortfolioWelcomeModal();
     const participantModal = createParticipantModal();
     const preSurveyModal = createPreSurveyModal();
     const postSurveyModal = createPostSurveyModal();
@@ -1087,6 +1115,7 @@ export async function initializeModals() {
     // Append modals to the permanent overlay instead of body
     const overlay = document.getElementById('permanentOverlay');
     overlay.appendChild(welcomeModal);
+    overlay.appendChild(portfolioWelcomeModal);
     overlay.appendChild(participantModal);
     overlay.appendChild(preSurveyModal);
     overlay.appendChild(postSurveyModal);

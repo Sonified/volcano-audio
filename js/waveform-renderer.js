@@ -286,15 +286,32 @@ export function drawWaveformFromMinMax() {
                 
                 // 🔥 PROTECTION: Ensure playheadX is finite before creating gradient
                 if (isFinite(playheadX) && playheadX >= 0 && playheadX <= width) {
-                    ctx.shadowBlur = 8;
-                    ctx.shadowColor = 'rgba(255, 0, 0, 0.54)'; // 0.6 * 0.9
-                    ctx.shadowOffsetX = 0;
-                    
+                    // 🔥 FIX: Use multi-stroke glow instead of shadowBlur (Chrome perf)
+                    // Outer glow stroke
+                    ctx.globalAlpha = 0.25;
+                    ctx.strokeStyle = `rgba(255, 50, 50, ${0.5 + pulseIntensity * 0.3})`;
+                    ctx.lineWidth = 12;
+                    ctx.beginPath();
+                    ctx.moveTo(playheadX, 0);
+                    ctx.lineTo(playheadX, height);
+                    ctx.stroke();
+
+                    // Inner glow stroke
+                    ctx.globalAlpha = 0.5;
+                    ctx.strokeStyle = `rgba(255, 80, 80, ${0.6 + pulseIntensity * 0.3})`;
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(playheadX, 0);
+                    ctx.lineTo(playheadX, height);
+                    ctx.stroke();
+
+                    // Core playhead stroke
+                    ctx.globalAlpha = 1.0;
                     const gradient = ctx.createLinearGradient(playheadX, 0, playheadX, height);
                     gradient.addColorStop(0, `rgba(255, 100, 100, ${(0.9 + pulseIntensity) * 0.9})`);
                     gradient.addColorStop(0.5, `rgba(255, 0, 0, ${(0.95 + pulseIntensity) * 0.9})`);
                     gradient.addColorStop(1, `rgba(255, 100, 100, ${(0.9 + pulseIntensity) * 0.9})`);
-                    
+
                     ctx.strokeStyle = gradient;
                     ctx.lineWidth = 3;
                     ctx.beginPath();
@@ -303,16 +320,12 @@ export function drawWaveformFromMinMax() {
                     ctx.stroke();
                 }
             
-                ctx.shadowBlur = 0;
                 ctx.strokeStyle = `rgba(220, 220, 220, ${(0.25 + pulseIntensity * 0.15) * 0.648})`;
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(playheadX, 0);
                 ctx.lineTo(playheadX, height);
                 ctx.stroke();
-                
-                ctx.shadowBlur = 0;
-                ctx.shadowColor = 'transparent';
             }
             
             // 🔥 Draw regions during crossfade so they stay visible throughout the transition
@@ -506,30 +519,44 @@ export function drawInterpolatedWaveform() {
             const time = performance.now() * 0.001;
             const pulseIntensity = 0.3 + Math.sin(time * 3) * 0.1;
             
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = 'rgba(255, 0, 0, 0.54)'; // 0.6 * 0.9
-            
+            // 🔥 FIX: Use multi-stroke glow instead of shadowBlur (Chrome perf)
+            // Outer glow
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = `rgba(255, 50, 50, ${0.5 + pulseIntensity * 0.3})`;
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+
+            // Inner glow
+            ctx.globalAlpha = 0.5;
+            ctx.strokeStyle = `rgba(255, 80, 80, ${0.6 + pulseIntensity * 0.3})`;
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+
+            // Core playhead
+            ctx.globalAlpha = 1.0;
             const gradient = ctx.createLinearGradient(x, 0, x, height);
             gradient.addColorStop(0, `rgba(255, 100, 100, ${(0.9 + pulseIntensity) * 0.9})`);
             gradient.addColorStop(0.5, `rgba(255, 0, 0, ${(0.95 + pulseIntensity) * 0.9})`);
             gradient.addColorStop(1, `rgba(255, 100, 100, ${(0.9 + pulseIntensity) * 0.9})`);
-            
+
             ctx.strokeStyle = gradient;
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, height);
             ctx.stroke();
-            
-            ctx.shadowBlur = 0;
             ctx.strokeStyle = `rgba(220, 220, 220, ${(0.25 + pulseIntensity * 0.15) * 0.648})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, height);
             ctx.stroke();
-            
-            ctx.shadowColor = 'transparent';
         }
     }
 }
