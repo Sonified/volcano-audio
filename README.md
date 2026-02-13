@@ -86,6 +86,22 @@ Browser → Railway Backend → IRIS → Browser
 - ✅ **Automatic Metadata**: Per-day JSON with min/max for consistent normalization
 - ✅ **Sample-Accurate Playback**: Zero clicks/pops between chunks
 
+## Backend Deployment (Railway)
+
+The data collector runs on **Railway** and auto-deploys from `main` branch via GitHub.
+
+**Key files:**
+- `backend/Dockerfile` — Defines the container (takes priority over nixpacks.toml)
+- `backend/requirements.txt` — Python dependencies (production only)
+- `backend/runtime.txt` — Pins Python to 3.11.11
+- `backend/collector_loop.py` — The collector service (~3500 lines)
+
+**Critical dependency note:** `setuptools` must be pinned to **69.5.1** (or any version <70). Setuptools 80+ removed `pkg_resources`, which ObsPy requires at runtime. The Dockerfile installs it explicitly before other dependencies. See the `DO NOT upgrade past 69.x` comment in the Dockerfile.
+
+**Python version:** Pinned to **3.11.11**. Do not use 3.12+ features in `collector_loop.py` (e.g., PEP 701 multi-line f-strings require 3.12+).
+
+**Build caching:** Railway's Nixpacks builder caches aggressively. If you need to bust the cache (e.g., after changing system dependencies), the Dockerfile is the reliable escape hatch — Railway uses it when present.
+
 ## Local Development Setup
 
 ### Quick Start - Local Collector

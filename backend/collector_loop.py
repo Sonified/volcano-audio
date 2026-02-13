@@ -2539,8 +2539,10 @@ def backfill():
             active_stations = get_active_stations_list()
             station_config = None
             for st in active_stations:
-                if (st['network'] == network and st['station'] == station and 
-                    st['channel'] == channel and st.get('location', '') == location.replace('--', '')):
+                st_loc = st.get('location', '').replace('--', '')
+                req_loc = location.replace('--', '')
+                if (st['network'] == network and st['station'] == station and
+                    st['channel'] == channel and st_loc == req_loc):
                     station_config = st
                     break
             
@@ -2600,13 +2602,12 @@ def backfill():
                 active_stations = get_active_stations_list()
                 station_config = None
                 for st in active_stations:
-                    loc = st.get('location', '').replace('', '--')
-                    if loc == '':
-                        loc = '--'
-                    if (st['network'] == station_info['network'] and 
-                        st['station'] == station_info['station'] and 
-                        st['channel'] == station_info['channel'] and 
-                        loc == station_info['location']):
+                    st_loc = st.get('location', '').replace('--', '')
+                    report_loc = station_info['location'].replace('--', '')
+                    if (st['network'] == station_info['network'] and
+                        st['station'] == station_info['station'] and
+                        st['channel'] == station_info['channel'] and
+                        st_loc == report_loc):
                         station_config = st
                         break
                 
