@@ -3009,17 +3009,18 @@ def backfill_station():
             try:
                 # Send initial progress update with audit results
                 try:
-                    yield f"data: {json.dumps({
-                        'type': 'start', 
-                        'total': total_chunks, 
-                        'backfill_id': backfill_id, 
+                    start_msg = json.dumps({
+                        'type': 'start',
+                        'total': total_chunks,
+                        'backfill_id': backfill_id,
                         'station': station_id,
                         'audit': {
                             'existing_counts': existing_counts,
                             'needed_counts': needed_counts,
                             'will_fetch_6h': len(six_hour_chunks)
                         }
-                    })}\n\n"
+                    })
+                    yield f"data: {start_msg}\n\n"
                 except (BrokenPipeError, OSError, GeneratorExit):
                     # Client disconnected, save metadata and exit
                     print("  ⚠️  Client disconnected during backfill start")
@@ -3425,12 +3426,13 @@ def backfill_station():
                 # This should be minimal since we save after each 6h chunk
                 if modified_metadata_dates:
                     try:
-                        yield f"data: {json.dumps({
+                        save_msg = json.dumps({
                             'type': 'progress',
                             'current': chunk_counter,
                             'total': total_chunks,
                             'message': f'Saving {len(modified_metadata_dates)} metadata file(s) to R2...'
-                        })}\n\n"
+                        })
+                        yield f"data: {save_msg}\n\n"
                     except (BrokenPipeError, OSError, GeneratorExit):
                         print("  ⚠️  Client disconnected during metadata save message - continuing to save metadata...")
                     
