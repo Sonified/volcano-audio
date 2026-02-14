@@ -1,0 +1,602 @@
+[
+  {
+    "responseId": "R_7UQjbQFWKmb3RL8",
+    "sessionId": "session_1763654897342_95weg6mt3",
+    "date": "2025-11-20T16:15:51.665Z",
+    "volcano": "Unknown",
+    "feature_count": 8,
+    "region_count": 3,
+    "pre_mood": {
+      "calm": null,
+      "energized": null,
+      "connected": null,
+      "nervous": null,
+      "focused": null,
+      "wonder": null
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": {
+      "1": 5,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 5,
+      "8": 4,
+      "9": 4,
+      "10": 4,
+      "11": 4,
+      "12": 4
+    },
+    "mood_changes": {
+      "calm": null,
+      "energized": null,
+      "connected": null,
+      "nervous": null,
+      "focused": null,
+      "wonder": null
+    }
+  },
+  {
+    "responseId": "R_0MJNpxUGLPA4Azc",
+    "sessionId": "session_1763655386568_093b2rado",
+    "date": "2025-11-20T16:28:08.572Z",
+    "volcano": "Unknown",
+    "feature_count": 8,
+    "region_count": 3,
+    "pre_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 0,
+      "energized": 0,
+      "connected": 0,
+      "nervous": 0,
+      "focused": 0,
+      "wonder": 0
+    }
+  },
+  {
+    "responseId": "R_6oq4U14wRW6Xf3o",
+    "sessionId": "session_1763656113149_4qm2ze0bv",
+    "date": "2025-11-20T16:34:03.341Z",
+    "volcano": "Unknown",
+    "feature_count": 10,
+    "region_count": 3,
+    "pre_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 0,
+      "energized": 0,
+      "connected": 0,
+      "nervous": 0,
+      "focused": 0,
+      "wonder": 0
+    }
+  },
+  {
+    "responseId": "R_5jymeieEriWibEG",
+    "sessionId": "session_1763782439730_b8lc24wdl",
+    "date": "2025-11-22T03:41:58.304Z",
+    "volcano": "Unknown",
+    "feature_count": 8,
+    "region_count": 3,
+    "pre_mood": {
+      "calm": 3,
+      "energized": 2,
+      "connected": 4,
+      "nervous": 1,
+      "focused": 3,
+      "wonder": 1
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 2,
+      "connected": 4,
+      "nervous": 1,
+      "focused": 3,
+      "wonder": 1
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 0,
+      "energized": 0,
+      "connected": 0,
+      "nervous": 0,
+      "focused": 0,
+      "wonder": 0
+    }
+  },
+  {
+    "responseId": "R_6VTgKGA8PvVVUNM",
+    "sessionId": "session_1763782937779_ua9obr9m4",
+    "date": "2025-11-22T03:48:55.955Z",
+    "volcano": "Unknown",
+    "feature_count": 7,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 2,
+      "connected": 4,
+      "nervous": 1,
+      "focused": 3,
+      "wonder": 1
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 0,
+      "energized": -1,
+      "connected": 1,
+      "nervous": -2,
+      "focused": 0,
+      "wonder": -2
+    }
+  },
+  {
+    "responseId": "R_8i9sVTOvd6jvkW2",
+    "sessionId": "session_1764004529887_lkh2sud3g",
+    "date": "2025-11-24T17:21:20.154Z",
+    "volcano": "Unknown",
+    "feature_count": 8,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 2,
+      "energized": 3,
+      "connected": 2,
+      "nervous": 1,
+      "focused": 3,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": {
+      "1": 5,
+      "2": 4,
+      "3": 3,
+      "4": 4,
+      "5": 5,
+      "6": 4,
+      "7": 5,
+      "8": 3,
+      "9": 2,
+      "10": 2,
+      "11": 2,
+      "12": 2
+    },
+    "mood_changes": {
+      "calm": 1,
+      "energized": 0,
+      "connected": 1,
+      "nervous": 2,
+      "focused": 0,
+      "wonder": 1
+    }
+  },
+  {
+    "responseId": "R_37tUYsR0iifaiqy",
+    "sessionId": "session_1764134107361_ourapio6w",
+    "date": "2025-11-26T05:20:09.366Z",
+    "volcano": "Unknown",
+    "feature_count": 10,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 2,
+      "energized": 2,
+      "connected": 2,
+      "nervous": 2,
+      "focused": 2,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 1,
+      "energized": 1,
+      "connected": 1,
+      "nervous": 1,
+      "focused": 1,
+      "wonder": 1
+    }
+  },
+  {
+    "responseId": "R_0fbprnNVnlrrjEy",
+    "sessionId": "session_1764134427182_nevpmpulv",
+    "date": "2025-11-26T05:23:56.785Z",
+    "volcano": "Unknown",
+    "feature_count": 12,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 2,
+      "energized": 2,
+      "connected": 2,
+      "nervous": 2,
+      "focused": 2,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 1,
+      "energized": 1,
+      "connected": 1,
+      "nervous": 1,
+      "focused": 1,
+      "wonder": 1
+    }
+  },
+  {
+    "responseId": "R_eg0d1zDcxll4ZAq",
+    "sessionId": "session_1764134427182_nevpmpulv",
+    "date": "2025-11-26T16:31:28.671Z",
+    "volcano": "Unknown",
+    "feature_count": 12,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 4,
+      "energized": 4,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 4,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 4,
+      "nervous": 2,
+      "focused": 4,
+      "wonder": 4
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": -1,
+      "energized": -1,
+      "connected": 1,
+      "nervous": -1,
+      "focused": 0,
+      "wonder": 2
+    }
+  },
+  {
+    "responseId": "R_erEMZ88DAaqOt3o",
+    "sessionId": "session_1764197093502_6d37zwzl5",
+    "date": "2025-12-01T06:22:27.584Z",
+    "volcano": "Unknown",
+    "feature_count": 14,
+    "region_count": 3,
+    "pre_mood": {
+      "calm": 2,
+      "energized": 2,
+      "connected": 1,
+      "nervous": 1,
+      "focused": 3,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 1,
+      "energized": 1,
+      "connected": 2,
+      "nervous": 2,
+      "focused": 0,
+      "wonder": 1
+    }
+  },
+  {
+    "responseId": "R_a4Cb98fS7AAP52u",
+    "sessionId": "session_1764197093502_6d37zwzl5",
+    "date": "2025-12-01T06:26:49.960Z",
+    "volcano": "Unknown",
+    "feature_count": 6,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 2,
+      "energized": 2,
+      "connected": 1,
+      "nervous": 1,
+      "focused": 2,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 1,
+      "energized": 1,
+      "connected": 2,
+      "nervous": 2,
+      "focused": 1,
+      "wonder": 1
+    }
+  },
+  {
+    "responseId": "R_6R9gcpRniGRK6oe",
+    "sessionId": "session_1764570425316_sa9h1p2va",
+    "date": "2025-12-01T06:30:27.017Z",
+    "volcano": "Unknown",
+    "feature_count": 3,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 0,
+      "energized": 0,
+      "connected": 0,
+      "nervous": 0,
+      "focused": 0,
+      "wonder": 0
+    }
+  },
+  {
+    "responseId": "R_ePzyMKGlFWdyPDo",
+    "sessionId": "session_1764824190748_krg7e78hg",
+    "date": "2025-12-04T05:06:03.688Z",
+    "volcano": "Unknown",
+    "feature_count": 20,
+    "region_count": 4,
+    "pre_mood": {
+      "calm": 2,
+      "energized": 3,
+      "connected": 2,
+      "nervous": 1,
+      "focused": 3,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 2,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 4,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": {
+      "1": 5,
+      "2": 4,
+      "3": 4,
+      "4": 5,
+      "5": 5,
+      "6": 6,
+      "7": 4,
+      "8": 4,
+      "9": 4,
+      "10": 5,
+      "11": 5,
+      "12": 4
+    },
+    "mood_changes": {
+      "calm": 0,
+      "energized": 0,
+      "connected": 1,
+      "nervous": 3,
+      "focused": 0,
+      "wonder": 1
+    }
+  },
+  {
+    "responseId": "R_1RDGWm6gxHrfghw",
+    "sessionId": "session_1764970971188_5pjpmmby5",
+    "date": "2025-12-07T15:45:19.929Z",
+    "volcano": "Unknown",
+    "feature_count": 18,
+    "region_count": 4,
+    "pre_mood": {
+      "calm": 4,
+      "energized": 2,
+      "connected": 2,
+      "nervous": 1,
+      "focused": 2,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 2,
+      "connected": 2,
+      "nervous": 2,
+      "focused": 2,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": -1,
+      "energized": 0,
+      "connected": 0,
+      "nervous": 1,
+      "focused": 0,
+      "wonder": 1
+    }
+  },
+  {
+    "responseId": "R_6kQzYxVdy24eO9g",
+    "sessionId": "session_1765299708702_kofs7uh6y",
+    "date": "2025-12-09T17:08:57.147Z",
+    "volcano": "Unknown",
+    "feature_count": 10,
+    "region_count": 3,
+    "pre_mood": {
+      "calm": 2,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 2,
+      "focused": 3,
+      "wonder": 2
+    },
+    "post_mood": {
+      "calm": 4,
+      "energized": 2,
+      "connected": 3,
+      "nervous": 2,
+      "focused": 3,
+      "wonder": 2
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 2,
+      "energized": -1,
+      "connected": 0,
+      "nervous": 0,
+      "focused": 0,
+      "wonder": 0
+    }
+  },
+  {
+    "responseId": "R_6EAP0AcevUBTHHE",
+    "sessionId": "session_1765299708702_kofs7uh6y",
+    "date": "2025-12-09T17:14:08.959Z",
+    "volcano": "Unknown",
+    "feature_count": 8,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "post_mood": {
+      "calm": 4,
+      "energized": 2,
+      "connected": 3,
+      "nervous": 2,
+      "focused": 4,
+      "wonder": 2
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 1,
+      "energized": -1,
+      "connected": 0,
+      "nervous": -1,
+      "focused": 1,
+      "wonder": -1
+    }
+  },
+  {
+    "responseId": "R_cPlrLJsqbcDiKrQ",
+    "sessionId": "session_1765300464798_zfuvtyalc",
+    "date": "2025-12-09T17:22:05.017Z",
+    "volcano": "Unknown",
+    "feature_count": 16,
+    "region_count": 2,
+    "pre_mood": {
+      "calm": 3,
+      "energized": 3,
+      "connected": 3,
+      "nervous": 3,
+      "focused": 3,
+      "wonder": 3
+    },
+    "post_mood": {
+      "calm": 3,
+      "energized": 2,
+      "connected": 3,
+      "nervous": 2,
+      "focused": 3,
+      "wonder": 3
+    },
+    "awesf": null,
+    "mood_changes": {
+      "calm": 0,
+      "energized": -1,
+      "connected": 0,
+      "nervous": -1,
+      "focused": 0,
+      "wonder": 0
+    }
+  }
+]

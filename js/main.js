@@ -15,7 +15,7 @@ import { togglePlayPause, toggleLoop, changePlaybackSpeed, changeVolume, resetSp
 import { initWaveformWorker, setupWaveformInteraction, drawWaveform, drawWaveformFromMinMax, drawWaveformWithSelection, changeWaveformFilter, updatePlaybackIndicator, startPlaybackIndicator } from './waveform-renderer.js';
 import { changeFrequencyScale, changeMinFrequency, loadFrequencyScale, startVisualization, setupSpectrogramSelection, cleanupSpectrogramSelection, redrawAllCanvasFeatureBoxes } from './spectrogram-renderer.js';
 import { clearCompleteSpectrogram, startMemoryMonitoring } from './spectrogram-complete-renderer.js';
-import { loadStations, loadSavedVolcano, updateStationList, enableFetchButton, purgeCloudflareCache, openParticipantModal, closeParticipantModal, submitParticipantSetup, openWelcomeModal, closeWelcomeModal, openEndModal, closeEndModal, openPreSurveyModal, closePreSurveyModal, submitPreSurvey, openPostSurveyModal, closePostSurveyModal, submitPostSurvey, openActivityLevelModal, closeActivityLevelModal, submitActivityLevelSurvey, openAwesfModal, closeAwesfModal, submitAwesfSurvey, changeBaseSampleRate, handleWaveformFilterChange, resetWaveformFilterToDefault, setupModalEventListeners, attemptSubmission, openBeginAnalysisModal, openCompleteConfirmationModal, openTutorialRevisitModal } from './ui-controls.js';
+import { loadStations, loadSavedVolcano, updateStationList, enableFetchButton, purgeCloudflareCache, openPortfolioWelcomeModal, openParticipantModal, closeParticipantModal, submitParticipantSetup, openWelcomeModal, closeWelcomeModal, openEndModal, closeEndModal, openPreSurveyModal, closePreSurveyModal, submitPreSurvey, openPostSurveyModal, closePostSurveyModal, submitPostSurvey, openActivityLevelModal, closeActivityLevelModal, submitActivityLevelSurvey, openAwesfModal, closeAwesfModal, submitAwesfSurvey, changeBaseSampleRate, handleWaveformFilterChange, resetWaveformFilterToDefault, setupModalEventListeners, attemptSubmission, openBeginAnalysisModal, openCompleteConfirmationModal, openTutorialRevisitModal } from './ui-controls.js';
 import { getParticipantIdFromURL, storeParticipantId, getParticipantId } from './qualtrics-api.js';
 import { initAdminMode, isAdminMode, toggleAdminMode } from './admin-mode.js';
 import { fetchFromR2Worker } from './data-fetcher.js';
@@ -1203,22 +1203,7 @@ async function updateParticipantIdDisplay() {
  * Perfect for demos and presentations - no surveys, no timeout, no tutorial
  */
 async function initializeShowcaseMode() {
-    console.log('✨ SHOWCASE MODE: Demo mode with participant ID');
-
-    // Set tutorial flags (skip tutorial, go straight to analysis)
-    localStorage.setItem('study_tutorial_in_progress', 'false');
-    localStorage.setItem('study_tutorial_completed', 'true');
-    localStorage.setItem('study_has_seen_tutorial', 'true');
-    localStorage.removeItem('study_begin_analysis_clicked_this_session');
-
-    console.log('🧹 Set showcase mode tutorial flags: completed=true, in_progress=false');
-
-    // Enable all features immediately
-    const { enableAllTutorialRestrictedFeatures, setStatusText } = await import('./tutorial-effects.js');
-    enableAllTutorialRestrictedFeatures();
-
-    // Show initial message to guide user
-    setStatusText('👈 Click "Fetch Data" to begin.', 'status info');
+    console.log('✨ SHOWCASE MODE: Portfolio mode with tutorial choice');
 
     // Volcano dropdown is never disabled in showcase mode (not a study mode)
     const volcanoSelect = document.getElementById('volcano');
@@ -1229,21 +1214,33 @@ async function initializeShowcaseMode() {
         console.log('🌋 Volcano selector always enabled in showcase mode');
     }
 
-    // Show participant modal on startup
+    // Show portfolio welcome modal on startup
     // 🎯 TOGGLE: Set to true to show every time (for testing), false to show only first time
     const SHOW_MODAL_EVERY_TIME = false;
 
-    setTimeout(() => {
-        const storedParticipantId = localStorage.getItem('participantId');
-        if (SHOW_MODAL_EVERY_TIME || !storedParticipantId || storedParticipantId.trim().length === 0) {
-            openParticipantModal();
-            console.log('👤 Opened participant ID modal for showcase mode');
+    setTimeout(async () => {
+        const hasSeenWelcome = localStorage.getItem('portfolio_has_seen_welcome');
+        if (SHOW_MODAL_EVERY_TIME || !hasSeenWelcome) {
+            await openPortfolioWelcomeModal();
+            console.log('👋 Opened portfolio welcome modal');
         } else {
-            console.log('✅ Participant ID already stored, skipping modal');
+            console.log('✅ Welcome already shown, initializing with previous choice');
+            // If they've seen it before, check their previous choice
+            const tutorialCompleted = localStorage.getItem('study_tutorial_completed') === 'true';
+            if (tutorialCompleted) {
+                // They skipped before, enable features
+                const { enableAllTutorialRestrictedFeatures, setStatusText } = await import('./tutorial-effects.js');
+                enableAllTutorialRestrictedFeatures();
+                setStatusText('👈 Click "Fetch Data" to begin.', 'status info');
+            } else {
+                // They chose tutorial before, start it
+                const { runInitialTutorial } = await import('./tutorial.js');
+                await runInitialTutorial();
+            }
         }
     }, 500);
 
-    console.log('✅ Showcase mode ready - all features enabled');
+    console.log('✅ Showcase mode ready');
 }
 
 /**
@@ -2069,8 +2066,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
             
             // Check if any modal is open - if so, let the modal handle Enter
-            const modalIds = ['welcomeModal', 'participantModal', 'preSurveyModal', 'postSurveyModal', 
-                             'activityLevelModal', 'awesfModal', 'endModal', 'beginAnalysisModal', 
+            const modalIds = ['welcomeModal', 'portfolioWelcomeModal', 'participantModal', 'preSurveyModal', 'postSurveyModal',
+                             'activityLevelModal', 'awesfModal', 'endModal', 'beginAnalysisModal',
                              'missingStudyIdModal', 'completeConfirmationModal'];
             const isModalOpen = modalIds.some(modalId => {
                 const modal = document.getElementById(modalId);

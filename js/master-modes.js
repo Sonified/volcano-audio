@@ -83,16 +83,17 @@ export const CURRENT_MODE = isLocalEnvironment()
 const MODE_CONFIG = {
     [AppMode.SHOWCASE]: {
         name: 'Showcase Mode',
-        description: 'Demo mode with participant ID prompt, no surveys or timeouts',
-        skipTutorial: true,
+        description: 'Portfolio mode - welcome modal with tutorial choice',
+        skipTutorial: false,  // Allow tutorial but give user choice
         showPreSurveys: false,
         showPostSurveys: false,
         requireQualtricsSubmission: false,
         enableAdminFeatures: false,
         showSubmitButton: true,
         autoStartPlayback: false,
-        promptForParticipantId: true,  // Show participant modal on startup
-        disableSessionTimeout: true    // No timeout in showcase mode
+        promptForParticipantId: false,  // Don't prompt for participant ID
+        showPortfolioWelcome: true,     // Show portfolio welcome modal instead
+        disableSessionTimeout: true     // No timeout in showcase mode
     },
 
     [AppMode.PERSONAL]: {

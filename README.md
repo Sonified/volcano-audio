@@ -102,6 +102,14 @@ The data collector runs on **Railway** and auto-deploys from `main` branch via G
 
 **Build caching:** Railway's Nixpacks builder caches aggressively. If you need to bust the cache (e.g., after changing system dependencies), the Dockerfile is the reliable escape hatch — Railway uses it when present.
 
+**Operational endpoints:**
+- `GET /health` — Health check (status, uptime, version)
+- `GET /status` — Detailed collector metrics
+- `GET /trigger` — Manually trigger a collection cycle
+- `GET /gaps/24h` — Detect missing data chunks (also: `4h`, `1h`, `complete`)
+- `POST /backfill` — Backfill missing chunks from IRIS (use `{"use_latest_report": true}` or manual windows)
+- `POST /purge-cache` — Purge Cloudflare CDN cache (requires `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_API_TOKEN` env vars on Railway)
+
 ## Local Development Setup
 
 ### Quick Start - Local Collector

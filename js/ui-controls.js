@@ -82,6 +82,7 @@ function showUIElementsAfterModal() {
 function checkIfAnyModalVisible() {
     const allModalIds = [
         'welcomeModal',
+        'portfolioWelcomeModal',
         'participantModal',
         'preSurveyModal',
         'postSurveyModal',
@@ -575,6 +576,7 @@ async function getNextModalInWorkflow(currentModalId) {
 export function closeAllModals() {
     const allModalIds = [
         'welcomeModal',
+        'portfolioWelcomeModal',
         'participantModal',
         'preSurveyModal',
         'postSurveyModal',
@@ -1947,6 +1949,92 @@ function removeModalEventListeners() {
     });
     
     modalListenersSetup = false;
+}
+
+export async function openPortfolioWelcomeModal() {
+    console.log('👋 openPortfolioWelcomeModal() called');
+
+    // Close all other modals first
+    closeAllModals();
+
+    const modal = document.getElementById('portfolioWelcomeModal');
+    if (!modal) {
+        console.error('❌ CRITICAL: Portfolio welcome modal not found in DOM!');
+        return;
+    }
+
+    // Fade in overlay background
+    fadeInOverlay();
+
+    // Show the modal
+    modal.style.display = 'flex';
+    hideUIElementsForModal();
+    console.log('✅ Portfolio welcome modal displayed');
+
+    // Return a promise that resolves when user makes a choice
+    return new Promise((resolve) => {
+        const beginTutorialBtn = document.getElementById('portfolioBeginTutorial');
+        const skipTutorialBtn = document.getElementById('portfolioSkipTutorial');
+
+        const handleBeginTutorial = async () => {
+            console.log('✅ User chose to BEGIN TUTORIAL');
+            localStorage.setItem('portfolio_has_seen_welcome', 'true');
+            localStorage.setItem('study_tutorial_in_progress', 'false');
+            localStorage.setItem('study_tutorial_completed', 'false');
+            localStorage.removeItem('study_has_seen_tutorial');
+
+            // Close modal
+            modal.style.display = 'none';
+            fadeOutOverlay();
+            showUIElementsAfterModal();
+
+            // Start tutorial
+            const { runInitialTutorial } = await import('./tutorial.js');
+            await runInitialTutorial();
+
+            cleanup();
+            resolve();
+        };
+
+        const handleSkipTutorial = async () => {
+            console.log('✅ User chose to SKIP TUTORIAL');
+            localStorage.setItem('portfolio_has_seen_welcome', 'true');
+            localStorage.setItem('study_tutorial_in_progress', 'false');
+            localStorage.setItem('study_tutorial_completed', 'true');
+            localStorage.setItem('study_has_seen_tutorial', 'true');
+
+            // Close modal
+            modal.style.display = 'none';
+            fadeOutOverlay();
+            showUIElementsAfterModal();
+
+            // Enable all features
+            const { enableAllTutorialRestrictedFeatures, setStatusText } = await import('./tutorial-effects.js');
+            enableAllTutorialRestrictedFeatures();
+            setStatusText('👈 Click "Fetch Data" to begin.', 'status info');
+
+            cleanup();
+            resolve();
+        };
+
+        const cleanup = () => {
+            if (beginTutorialBtn) beginTutorialBtn.removeEventListener('click', handleBeginTutorial);
+            if (skipTutorialBtn) skipTutorialBtn.removeEventListener('click', handleSkipTutorial);
+        };
+
+        // Add event listeners
+        if (beginTutorialBtn) {
+            beginTutorialBtn.addEventListener('click', handleBeginTutorial);
+        } else {
+            console.error('❌ Begin Tutorial button not found');
+        }
+
+        if (skipTutorialBtn) {
+            skipTutorialBtn.addEventListener('click', handleSkipTutorial);
+        } else {
+            console.error('❌ Skip Tutorial button not found');
+        }
+    });
 }
 
 export async function openParticipantModal() {

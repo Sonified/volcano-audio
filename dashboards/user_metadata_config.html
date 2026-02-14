@@ -329,6 +329,7 @@
             const flags = {
                 'study_has_seen_participant_setup': localStorage.getItem('study_has_seen_participant_setup'),
                 'study_has_seen_welcome': localStorage.getItem('study_has_seen_welcome'),
+                'portfolio_has_seen_welcome': localStorage.getItem('portfolio_has_seen_welcome'),
                 'study_has_seen_welcome_back': localStorage.getItem('study_has_seen_welcome_back'),
                 'study_has_seen_tutorial': localStorage.getItem('study_has_seen_tutorial'),
                 'study_tutorial_in_progress': localStorage.getItem('study_tutorial_in_progress'),
@@ -492,6 +493,7 @@
                 { type: 'header', icon: '👤', label: 'ONBOARDING' },
                 { type: 'checkbox', key: 'study_has_seen_participant_setup', label: 'Participant Setup Seen', value: workflowFlags.study_has_seen_participant_setup },
                 { type: 'checkbox', key: 'study_has_seen_welcome', label: 'Welcome Seen', value: workflowFlags.study_has_seen_welcome },
+                { type: 'checkbox', key: 'portfolio_has_seen_welcome', label: 'Portfolio Welcome Seen', value: workflowFlags.portfolio_has_seen_welcome },
                 { type: 'checkbox', key: 'study_tutorial_in_progress', label: 'Tutorial In Progress', value: workflowFlags.study_tutorial_in_progress },
                 { type: 'checkbox', key: 'study_tutorial_completed', label: 'Tutorial Completed', value: workflowFlags.study_tutorial_completed },
                 { type: 'checkbox', key: 'study_has_seen_tutorial', label: 'Tutorial Seen (LEGACY)', value: workflowFlags.study_has_seen_tutorial },
@@ -787,6 +789,7 @@ MODE: ${localStorage.getItem('selectedMode') || 'Using default'}
             const flagMappings = [
                 { id: 'flag_study_has_seen_participant_setup', key: 'study_has_seen_participant_setup' },
                 { id: 'flag_study_has_seen_welcome', key: 'study_has_seen_welcome' },
+                { id: 'flag_portfolio_has_seen_welcome', key: 'portfolio_has_seen_welcome' },
                 { id: 'flag_study_has_seen_welcome_back', key: 'study_has_seen_welcome_back' },
                 { id: 'flag_study_tutorial_completed', key: 'study_tutorial_completed' },
                 { id: 'flag_study_begin_analysis_clicked_this_session', key: 'study_begin_analysis_clicked_this_session' },
@@ -895,6 +898,7 @@ MODE: ${localStorage.getItem('selectedMode') || 'Using default'}
 👤 ONBOARDING
 study_has_seen_participant_setup: ${workflowFlags.study_has_seen_participant_setup || 'null'}
 study_has_seen_welcome: ${workflowFlags.study_has_seen_welcome || 'null'}
+portfolio_has_seen_welcome: ${workflowFlags.portfolio_has_seen_welcome || 'null'}
 study_tutorial_in_progress: ${workflowFlags.study_tutorial_in_progress || 'null'}
 study_tutorial_completed: ${workflowFlags.study_tutorial_completed || 'null'}
 study_has_seen_tutorial (LEGACY): ${workflowFlags.study_has_seen_tutorial || 'null'}
@@ -918,6 +922,7 @@ study_session_completion_tracker: ${workflowFlags.study_session_completion_track
         function clearAllFlags() {
             // Clear onboarding
             localStorage.removeItem('study_has_seen_participant_setup');
+            localStorage.removeItem('portfolio_has_seen_welcome');
             localStorage.removeItem('study_tutorial_in_progress');
             localStorage.removeItem('study_tutorial_completed');
             localStorage.removeItem('study_has_seen_tutorial'); // LEGACY flag
@@ -941,6 +946,7 @@ study_session_completion_tracker: ${workflowFlags.study_session_completion_track
             
             // Uncheck all checkboxes
             document.getElementById('flag_study_has_seen_participant_setup').checked = false;
+            document.getElementById('flag_portfolio_has_seen_welcome').checked = false;
             document.getElementById('flag_study_tutorial_in_progress').checked = false;
             document.getElementById('flag_study_tutorial_completed').checked = false;
             document.getElementById('flag_study_has_seen_tutorial').checked = false; // LEGACY flag
@@ -981,15 +987,17 @@ study_session_completion_tracker: ${workflowFlags.study_session_completion_track
                 // Clear onboarding flags
                 localStorage.removeItem('study_has_seen_participant_setup');
                 localStorage.removeItem('study_has_seen_welcome');
+                localStorage.removeItem('portfolio_has_seen_welcome');
                 localStorage.removeItem('study_tutorial_in_progress');
                 localStorage.removeItem('study_tutorial_completed');
                 localStorage.removeItem('study_has_seen_tutorial'); // LEGACY flag
                 document.getElementById('flag_study_has_seen_participant_setup').checked = false;
                 document.getElementById('flag_study_has_seen_welcome').checked = false;
+                document.getElementById('flag_portfolio_has_seen_welcome').checked = false;
                 document.getElementById('flag_study_tutorial_in_progress').checked = false;
                 document.getElementById('flag_study_tutorial_completed').checked = false;
                 document.getElementById('flag_study_has_seen_tutorial').checked = false; // LEGACY flag
-                clearedCount = 5;
+                clearedCount = 6;
             } else if (sectionId === 'current_session') {
                 // Clear current session flags
                 localStorage.removeItem('study_has_seen_welcome_back');
