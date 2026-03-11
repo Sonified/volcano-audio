@@ -5827,7 +5827,7 @@ def cleanup_old_data(full_scan=False):
 
     STUDY_CUTOFF = date(2025, 12, 15)
     RETENTION_DAYS = 14
-    DRY_RUN = os.getenv('DRY_RUN_CLEANUP', 'true').lower() == 'true'
+    DRY_RUN = os.getenv('DRY_RUN_CLEANUP', 'false').lower() == 'true'
 
     today = datetime.now(timezone.utc).date()
     retention_start = today - timedelta(days=RETENTION_DAYS)
