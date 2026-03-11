@@ -5692,13 +5692,13 @@ def retention_check():
     dry_run = os.getenv('DRY_RUN_CLEANUP', 'true').lower() == 'true'
 
     import threading
-    thread = threading.Thread(target=cleanup_old_data)
+    thread = threading.Thread(target=cleanup_old_data, kwargs={'full_scan': True})
     thread.start()
 
     return jsonify({
         'status': 'triggered',
         'mode': 'DRY RUN' if dry_run else 'LIVE — deletions will occur!',
-        'message': 'Retention cleanup started',
+        'message': 'Full retention scan started (study cutoff through retention boundary)',
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'note': 'Check Railway logs for results'
     })
@@ -5814,12 +5814,14 @@ def wait_until_next_run():
     time.sleep(seconds_until_next_run)
 
 
-def cleanup_old_data():
+def cleanup_old_data(full_scan=False):
     """
     Rolling data retention: delete seismic data outside the retention windows.
     Preserves: study era (through Dec 15, 2025) + last 14 days.
     Purges: everything in between under data/YYYY/MM/DD/ prefix only.
-    Runs daily at 00:02 UTC.
+
+    full_scan=False (daily): only checks 3 days at the retention boundary
+    full_scan=True (/retention-check): scans the entire gap from study cutoff
     """
     from datetime import date
 
@@ -5830,8 +5832,16 @@ def cleanup_old_data():
     today = datetime.now(timezone.utc).date()
     retention_start = today - timedelta(days=RETENTION_DAYS)
 
-    # The purgeable window: day after study cutoff through day before retention window
-    purge_start = STUDY_CUTOFF + timedelta(days=1)
+    if full_scan:
+        # Scan entire gap from study cutoff (for manual /retention-check)
+        purge_start = STUDY_CUTOFF + timedelta(days=1)
+    else:
+        # Daily: only scan 3 days at the retention boundary edge
+        purge_start = retention_start - timedelta(days=3)
+        # Never purge into the study era
+        if purge_start <= STUDY_CUTOFF:
+            purge_start = STUDY_CUTOFF + timedelta(days=1)
+
     purge_end = retention_start - timedelta(days=1)
 
     if purge_start > purge_end:
