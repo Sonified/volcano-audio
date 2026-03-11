@@ -5681,6 +5681,28 @@ def nuke():
             'deleted_count': deleted_count
         }), 500
 
+@app.route('/retention-check')
+def retention_check():
+    """
+    🧹 Manually trigger data retention cleanup.
+    Respects DRY_RUN_CLEANUP env var (default: true).
+    """
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] 🧹 Manual retention check requested")
+
+    dry_run = os.getenv('DRY_RUN_CLEANUP', 'true').lower() == 'true'
+
+    import threading
+    thread = threading.Thread(target=cleanup_old_data)
+    thread.start()
+
+    return jsonify({
+        'status': 'triggered',
+        'mode': 'DRY RUN' if dry_run else 'LIVE — deletions will occur!',
+        'message': 'Retention cleanup started',
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'note': 'Check Railway logs for results'
+    })
+
 @app.route('/trigger')
 def trigger_collection():
     """
