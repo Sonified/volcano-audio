@@ -5689,7 +5689,7 @@ def retention_check():
     """
     print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] 🧹 Manual retention check requested")
 
-    dry_run = os.getenv('DRY_RUN_CLEANUP', 'true').lower() == 'true'
+    dry_run = os.getenv('DRY_RUN_CLEANUP', 'false').lower() == 'true'
 
     import threading
     thread = threading.Thread(target=cleanup_old_data, kwargs={'full_scan': True})
