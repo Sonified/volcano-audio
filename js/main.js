@@ -626,7 +626,10 @@ export async function startStreaming(event) {
         // Log what we're fetching
         const stationLabel = `${stationData.network}.${stationData.station}.${stationData.location || '--'}.${stationData.channel}`;
         if (!isStudyMode()) {
-            console.log(`🌋 Fetching data for ${volcano} from station ${stationLabel}`);
+            console.log(`\n${'═'.repeat(60)}`);
+            console.log(`🌋 FETCH START: ${volcano} — station ${stationLabel}`);
+            console.log(`   Duration: ${duration}h | High-pass: ${highpassFreq} | Normalize: ${enableNormalize}`);
+            console.log(`${'═'.repeat(60)}`);
         }
         
         // Track fetch data action
@@ -765,7 +768,8 @@ export async function startStreaming(event) {
             }
             
             if (!isStudyMode()) {
-                console.log(`📋 ${logTime()} Station ${stationData.network}.${stationData.station}: active=${isActiveStation}`);
+                const source = isActiveStation ? '☁️ CDN (cdn.now.audio)' : '🚂 Railway backend → IRIS';
+                console.log(`📋 ${logTime()} Station ${stationData.network}.${stationData.station}: active=${isActiveStation} → source: ${source}`);
             }
             return isActiveStation;
         })();
@@ -800,10 +804,12 @@ export async function startStreaming(event) {
             const location = stationData.location || '--';
             const sampleRate = Math.round(stationData.sample_rate || 100);
             
-            const bypassCache = document.getElementById('bypassCache').checked;
+            const bypassCacheCheckbox = document.getElementById('bypassCache');
+            const forceServerFetchCheckbox = document.getElementById('forceServerFetch');
+            const bypassCache = (bypassCacheCheckbox && bypassCacheCheckbox.checked) || (forceServerFetchCheckbox && forceServerFetchCheckbox.checked);
             const cacheBuster = bypassCache ? `?t=${Date.now()}` : '';
             if (bypassCache) {
-                console.log(`🚫 ${logTime()} Cache bypass ENABLED`);
+                console.log(`🚫 ${logTime()} Cache bypass ENABLED (force server fetch)`);
             }
             
             realisticChunkPromise = (async () => {
@@ -904,9 +910,11 @@ export async function startStreaming(event) {
             statusEl.textContent = '';  // Just clear it, period. No checking!
         }
         
-        const baseMessage = forceIrisFetch 
-            ? `📡 Fetching data for station ${stationLabel} (${stationData.distance_km}km) from IRIS Server`
-            : (isActiveStation ? `📡 Fetching data for station ${stationLabel} (${stationData.distance_km}km) from R2 Server` : `📡 Fetching data for station ${stationLabel} (${stationData.distance_km}km) from Railway Server`);
+        const serverName = forceIrisFetch ? 'IRIS Server' : (isActiveStation ? 'CDN (cdn.now.audio)' : 'Railway → IRIS');
+        const baseMessage = `📡 Fetching station ${stationLabel} (${stationData.distance_km}km) from ${serverName}`;
+        if (!isStudyMode()) {
+            console.log(`\n🚀 ${logTime()} ${baseMessage}`);
+        }
         document.getElementById('status').className = 'status info loading';
         document.getElementById('status').textContent = baseMessage;
         
@@ -1052,7 +1060,13 @@ export async function startStreaming(event) {
             if (!isStudyMode()) {
                 console.log(`🌐 ${logTime()} Using CDN direct (active station)`);
             }
-            await fetchFromR2Worker(stationData, startTime, estimatedEndTime, duration, highpassFreq, realisticChunkPromise, firstChunkStart);
+            try {
+                await fetchFromR2Worker(stationData, startTime, estimatedEndTime, duration, highpassFreq, realisticChunkPromise, firstChunkStart);
+            } catch (cdnError) {
+                console.log(`⚠️ ${logTime()} CDN fetch failed (${cdnError.message}), falling back to IRIS via Railway...`);
+                const { fetchFromRailway } = await import('./data-fetcher.js');
+                await fetchFromRailway(stationData, startTime, duration, highpassFreq, enableNormalize);
+            }
         } else {
             console.log(`🚂 ${logTime()} Using Railway backend for inactive station (fetches from IRIS)`);
             const { fetchFromRailway } = await import('./data-fetcher.js');
@@ -1538,11 +1552,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     const modeSelector = document.getElementById('modeSelector');
     
     // Detect if running locally
-    const isLocal = window.location.hostname === 'localhost' || 
-                    window.location.hostname === '127.0.0.1' || 
+    const isLocal = window.location.hostname === 'localhost' ||
+                    window.location.hostname === '127.0.0.1' ||
                     window.location.hostname === '' ||
                     window.location.protocol === 'file:';
-    
+
+    // Show "Force Server Fetch" checkbox only on local servers
+    const forceServerFetchContainer = document.getElementById('forceServerFetchContainer');
+    if (forceServerFetchContainer && isLocal) {
+        forceServerFetchContainer.style.display = 'flex';
+    }
+
     // Mode selector visibility logic:
     // - Production (not local): Always hidden (study mode enforced)
     // - Local non-study modes: Always visible (dev, personal, etc.)
@@ -1988,6 +2008,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         enableFetchButton();
         e.target.blur(); // Blur so spacebar can toggle play/pause
     });
+    const forceServerFetchEl = document.getElementById('forceServerFetch');
+    if (forceServerFetchEl) {
+        forceServerFetchEl.addEventListener('change', (e) => {
+            enableFetchButton();
+            e.target.blur(); // Blur so spacebar can toggle play/pause
+        });
+    }
     document.getElementById('baseSampleRate').addEventListener('change', (e) => {
         changeBaseSampleRate();
         e.target.blur(); // Blur so spacebar can toggle play/pause
@@ -2126,7 +2153,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
     
     // Blur checkboxes
-    const checkboxes = ['enableNormalize', 'bypassCache'];
+    const checkboxes = ['enableNormalize', 'bypassCache', 'forceServerFetch'];
     checkboxes.forEach(id => {
         const checkbox = document.getElementById(id);
         if (checkbox) {

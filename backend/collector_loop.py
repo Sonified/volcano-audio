@@ -5792,6 +5792,78 @@ def wait_until_next_run():
     time.sleep(seconds_until_next_run)
 
 
+def cleanup_old_data():
+    """
+    Rolling data retention: delete seismic data outside the retention windows.
+    Preserves: study era (through Dec 15, 2025) + last 14 days.
+    Purges: everything in between under data/YYYY/MM/DD/ prefix only.
+    Runs daily at 00:02 UTC.
+    """
+    from datetime import date
+
+    STUDY_CUTOFF = date(2025, 12, 15)
+    RETENTION_DAYS = 14
+    DRY_RUN = os.getenv('DRY_RUN_CLEANUP', 'true').lower() == 'true'
+
+    today = datetime.now(timezone.utc).date()
+    retention_start = today - timedelta(days=RETENTION_DAYS)
+
+    # The purgeable window: day after study cutoff through day before retention window
+    purge_start = STUDY_CUTOFF + timedelta(days=1)
+    purge_end = retention_start - timedelta(days=1)
+
+    if purge_start > purge_end:
+        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] 🧹 Cleanup: Nothing to purge (study cutoff + retention window overlap)")
+        return
+
+    mode_label = "DRY RUN" if DRY_RUN else "LIVE"
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] 🧹 Cleanup [{mode_label}]: Purging data/ from {purge_start} to {purge_end}")
+
+    s3 = boto3.client(
+        's3',
+        endpoint_url=f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com',
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name='auto'
+    )
+
+    total_deleted = 0
+    total_days_purged = 0
+    paginator = s3.get_paginator('list_objects_v2')
+
+    current_date = purge_start
+    while current_date <= purge_end:
+        prefix = f"data/{current_date.year}/{current_date.month:02d}/{current_date.day:02d}/"
+
+        day_objects = []
+        try:
+            pages = paginator.paginate(Bucket=R2_BUCKET_NAME, Prefix=prefix)
+            for page in pages:
+                if 'Contents' not in page:
+                    continue
+                day_objects.extend([{'Key': obj['Key']} for obj in page['Contents']])
+        except Exception as e:
+            print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}]   ❌ Error listing {prefix}: {e}")
+            current_date += timedelta(days=1)
+            continue
+
+        if day_objects:
+            if DRY_RUN:
+                print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}]   🔍 [DRY RUN] Would delete {len(day_objects)} objects from {prefix}")
+            else:
+                for i in range(0, len(day_objects), 1000):
+                    batch = day_objects[i:i+1000]
+                    s3.delete_objects(Bucket=R2_BUCKET_NAME, Delete={'Objects': batch})
+                print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}]   🗑️  Deleted {len(day_objects)} objects from {prefix}")
+
+            total_deleted += len(day_objects)
+            total_days_purged += 1
+
+        current_date += timedelta(days=1)
+
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] 🧹 Cleanup [{mode_label}] complete: {total_deleted} objects across {total_days_purged} days")
+
+
 def auto_heal_gaps():
     """
     Automated self-healing: Detect and backfill gaps from last 6 hours.
@@ -5939,6 +6011,9 @@ def run_cron_job():
     
     # Check if this is a 6-hour checkpoint (will trigger auto-heal AFTER collection)
     should_auto_heal = (now.hour % 6 == 0 and now.minute in [0, 1, 2, 3, 4])
+
+    # Daily cleanup at 00:02 UTC — purge old seismic data outside retention windows
+    should_cleanup = (now.hour == 0 and now.minute in [0, 1, 2, 3, 4])
     
     # Initialize tracking variables (accessible in finally block)
     total_tasks = 0
@@ -6033,6 +6108,13 @@ def run_cron_job():
             # Run auto-heal AFTER successful collection at 6-hour checkpoints
             if should_auto_heal:
                 auto_heal_gaps()
+
+            # Run daily data retention cleanup at 00:02 UTC
+            if should_cleanup:
+                try:
+                    cleanup_old_data()
+                except Exception as e:
+                    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] ❌ Cleanup failed (non-fatal): {e}")
         else:
             # Some tasks failed - record failure
             failure_time = datetime.now(timezone.utc).isoformat()
