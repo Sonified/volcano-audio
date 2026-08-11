@@ -7,7 +7,7 @@
  */
 
 // Backend endpoint (production)
-const UPLOAD_ENDPOINT = 'https://volcano-audio-collector-production.up.railway.app/api/upload-user-data';
+const UPLOAD_ENDPOINT = 'https://volcano-collector.robertalexander-music.workers.dev/api/upload-user-data';
 
 /**
  * Gather all localStorage data for upload

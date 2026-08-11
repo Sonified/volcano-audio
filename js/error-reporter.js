@@ -336,7 +336,7 @@ async function submitErrorReport(errorMessage, errorDetails) {
     };
 
     try {
-        const response = await fetch('https://volcano-audio-collector-production.up.railway.app/api/report-error', {
+        const response = await fetch('https://volcano-collector.robertalexander-music.workers.dev/api/report-error', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

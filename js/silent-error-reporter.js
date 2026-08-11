@@ -103,7 +103,7 @@ export async function reportMetadataMismatch(errorType, details) {
         console.log(`🔕 Silent error report: ${errorType}`, details);
 
         // Submit to backend (silent - don't block on failure)
-        const response = await fetch('https://volcano-audio-collector-production.up.railway.app/api/report-error', {
+        const response = await fetch('https://volcano-collector.robertalexander-music.workers.dev/api/report-error', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(errorReport)
