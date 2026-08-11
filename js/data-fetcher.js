@@ -280,8 +280,10 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
     // CDN URL (direct R2 access via Cloudflare CDN - 7.8x faster than worker!)
     const CDN_BASE_URL = 'https://cdn.now.audio/data';
     
-    // Check if cache bypass is enabled
-    const bypassCache = document.getElementById('bypassCache').checked;
+    // Check if cache bypass is enabled (either CDN bypass or Force Server Fetch)
+    const bypassCacheCheckbox = document.getElementById('bypassCache');
+    const forceServerFetchCheckbox = document.getElementById('forceServerFetch');
+    const bypassCache = (bypassCacheCheckbox && bypassCacheCheckbox.checked) || (forceServerFetchCheckbox && forceServerFetchCheckbox.checked);
     const cacheBuster = bypassCache ? `?t=${Date.now()}` : '';
     
     // Get high-pass filter setting from UI (same as Railway)
@@ -292,14 +294,13 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
     const logTime = () => `[${Math.round(performance.now() - window.streamingStartTime)}ms]`;
     // Only log in dev/personal modes, not study mode
     if (!isStudyMode()) {
-        console.log(`📡 ${logTime()} Fetching from CDN (direct):`, {
-            network: stationData.network,
-            station: stationData.station,
-            location: stationData.location || '--',
-            channel: stationData.channel,
-            start_time: startTime.toISOString(),
-            duration_minutes: durationMinutes
-        });
+        console.log(`📡 ${logTime()} Fetching from CDN (direct): ${CDN_BASE_URL}`);
+        console.log(`   Station: ${stationData.network}.${stationData.station}.${stationData.location || '--'}.${stationData.channel}`);
+        console.log(`   Time range: ${startTime.toISOString()} → ${estimatedEndTime.toISOString()} (${durationMinutes} min)`);
+        if (bypassCache) {
+            const source = (forceServerFetchCheckbox && forceServerFetchCheckbox.checked) ? 'Force Server Fetch' : 'Bypass CDN Cache';
+            console.log(`   🚫 Cache bypass ENABLED (${source}) — appending cache-buster to all URLs`);
+        }
     }
         
         // STEP 1: Fetch metadata (realistic chunk already running!)
@@ -1145,22 +1146,20 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
         // Create download batches using our validated algorithm
         const downloadBatches = createDownloadBatches(chunksToFetch);
         
-        // Log chunk breakdown
+        // Log chunk breakdown (always show - helps debug data download issues)
         const typeCount = chunksToFetch.reduce((acc, c) => {
             acc[c.type] = (acc[c.type] || 0) + 1;
             return acc;
         }, {});
-        if (DEBUG_CHUNKS) console.log(`📋 ${logTime()} Progressive chunks: ${chunksToFetch.length} total`);
-        if (DEBUG_CHUNKS) console.log(`📋 ${logTime()} Breakdown: ${Object.entries(typeCount).map(([t, c]) => `${c}×${t}`).join(', ')}`);
-        
+
         // Show batch plan
         const batchPlan = downloadBatches.map((batch, i) => {
             const type = chunksToFetch[batch[0]].type;
             return batch.length === 1 ? `1×${type}` : `${batch.length}×${type}`;
         }).join(' → ');
-        if (DEBUG_CHUNKS) {
-            console.log(`🚀 ${logTime()} Download plan: ${batchPlan}`);
-            console.log(`📦 ${logTime()} Total batches: ${downloadBatches.length}`);
+        if (!isStudyMode()) {
+            console.log(`📦 ${logTime()} Download plan: ${chunksToFetch.length} chunks (${Object.entries(typeCount).map(([t, c]) => `${c}×${t}`).join(', ')}) in ${downloadBatches.length} batches`);
+            console.log(`   Batch order: ${batchPlan}`);
         }
         
         // Fetch function - DIRECT FROM CDN
@@ -1295,7 +1294,7 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
                 }, [compressed]);
                 
                 const chunkType = chunksToFetch[index].type;
-                if (DEBUG_CHUNKS) console.log(`📥 ${logTime()} Downloaded chunk ${index + 1}/${chunksToFetch.length} (${chunkType}) - ${(chunkSize / 1024).toFixed(1)} KB (${chunksDownloaded}/${chunksToFetch.length})`);
+                if (!isStudyMode()) console.log(`📥 ${logTime()} Chunk ${index + 1}/${chunksToFetch.length} (${chunkType}) — ${(chunkSize / 1024).toFixed(1)} KB [${chunksDownloaded}/${chunksToFetch.length} done]`);
             }
         };
         
@@ -1307,8 +1306,8 @@ export async function fetchFromR2Worker(stationData, startTime, estimatedEndTime
                 `1×${chunkType} alone` : 
                 `${batchIndices.length}×${chunkType} parallel`;
             
-            if (DEBUG_CHUNKS) console.log(`📦 ${logTime()} Batch ${batchIdx + 1}/${downloadBatches.length}: ${batchLabel} (chunks ${batchIndices.map(i => i + 1).join(', ')})`);
-            
+            if (!isStudyMode()) console.log(`📦 ${logTime()} Downloading batch ${batchIdx + 1}/${downloadBatches.length}: ${batchLabel}`);
+
             // Download all chunks in this batch IN PARALLEL (or generate zeros for missing)
             const batchPromises = batchIndices.map(idx => {
                 const chunk = chunksToFetch[idx];
@@ -1375,7 +1374,7 @@ export async function fetchFromRailway(stationData, startTime, duration, highpas
     console.log('📡 Requesting from Railway:', requestBody);
     
     // Determine backend URL (unified collector service has both scheduled collection + on-demand streaming)
-    const backendUrl = 'https://volcano-audio-collector-production.up.railway.app/api/stream-audio';
+    const backendUrl = 'https://volcano-collector.robertalexander-music.workers.dev/api/stream-audio';
     console.log(`🌐 Using Railway backend: ${backendUrl}`);
     
     const response = await fetch(backendUrl, {
