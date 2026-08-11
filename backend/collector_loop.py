@@ -4,7 +4,7 @@ Seismic Data Collector Service for Railway Deployment
 Runs data collection every 10 minutes at :02, :12, :22, :32, :42, :52
 Provides HTTP API for health monitoring, status, validation, and gap detection
 """
-__version__ = "2025_11_19_v2.49"
+__version__ = "2026_08_11_v2.50"
 import time
 import sys
 import os
@@ -36,12 +36,20 @@ from audio_stream import audio_stream_bp
 app.register_blueprint(audio_stream_bp)
 
 # Detect deployment environment
-# Railway sets RAILWAY_ENVIRONMENT, local dev won't have this
-IS_PRODUCTION = os.getenv('RAILWAY_ENVIRONMENT') is not None
+# Railway sets RAILWAY_ENVIRONMENT; the Cloudflare container image sets
+# CLOUDFLARE_DEPLOYMENT (see Dockerfile.cloudflare). Local dev has neither.
+IS_RAILWAY = os.getenv('RAILWAY_ENVIRONMENT') is not None
+IS_CLOUDFLARE = os.getenv('CLOUDFLARE_DEPLOYMENT') is not None
+IS_PRODUCTION = IS_RAILWAY or IS_CLOUDFLARE
 # Allow forcing R2 uploads even in local mode (useful for backfills)
 FORCE_R2_UPLOAD = os.getenv('FORCE_R2_UPLOAD', 'false').lower() == 'true'
 USE_R2 = IS_PRODUCTION or FORCE_R2_UPLOAD
-DEPLOYMENT_ENV = "PRODUCTION (Railway)" if IS_PRODUCTION else "LOCAL (Development)"
+if IS_CLOUDFLARE:
+    DEPLOYMENT_ENV = "PRODUCTION (Cloudflare)"
+elif IS_RAILWAY:
+    DEPLOYMENT_ENV = "PRODUCTION (Railway)"
+else:
+    DEPLOYMENT_ENV = "LOCAL (Development)"
 if FORCE_R2_UPLOAD and not IS_PRODUCTION:
     DEPLOYMENT_ENV += " (R2 uploads enabled)"
 
@@ -6296,13 +6304,22 @@ def main():
     print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] v1.89 UI: Panel styling improvements - replaced nth-child selectors with class-based selectors, reduced button/panel heights, improved slider styling, changed 'Tracked Regions' to 'Selected Regions'")
     print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Git commit: v1.89 UI: Panel styling improvements - replaced nth-child selectors with class-based selectors, reduced button/panel heights, improved slider styling, changed 'Tracked Regions' to 'Selected Regions'")
     
-    # Start Flask server in background thread
     port = int(os.getenv('PORT', 5000))
     print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting health API on port {port}")
+
+    # Cloudflare Containers mode: the Worker cron fires GET /trigger every
+    # 10 minutes, so no internal scheduler — the container sleeps between
+    # runs. Flask runs in the main thread instead.
+    if os.getenv('DISABLE_INTERNAL_SCHEDULER', 'false').lower() == 'true':
+        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] ⏰ Internal scheduler DISABLED — collection fires via external cron (/trigger)")
+        app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+        return
+
+    # Start Flask server in background thread
     flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False))
     flask_thread.daemon = True
     flask_thread.start()
-    
+
     # Run scheduler in main thread
     run_scheduler()
 

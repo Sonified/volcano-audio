@@ -1,0 +1,38 @@
+// Cloudflare Workers + Containers deployment for the seismic collector.
+// Replaces Railway. Deploy from backend/: npx wrangler deploy
+// (requires Docker running locally to build the container image)
+{
+  "name": "volcano-collector",
+  "main": "cf/index.js",
+  "compatibility_date": "2026-08-01",
+
+  "observability": { "enabled": true },
+
+  // Same schedule the Railway internal scheduler ran: every 10 min at :02
+  "triggers": {
+    "crons": ["2,12,22,32,42,52 * * * *"]
+  },
+
+  "containers": [
+    {
+      "class_name": "VolcanoCollector",
+      "image": "./Dockerfile.cloudflare",
+      "instance_type": "basic",
+      "max_instances": 1
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [{ "class_name": "VolcanoCollector", "name": "COLLECTOR" }]
+  },
+
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VolcanoCollector"] }],
+
+  // Non-secret config. Secrets (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+  // optionally SMTP_USERNAME/SMTP_PASSWORD, CLOUDFLARE_ZONE_ID/PURGE_API_TOKEN)
+  // are set via: npx wrangler secret put <NAME>
+  "vars": {
+    "R2_ACCOUNT_ID": "66f906f29f28b08ae9c80d4f36e25c7a",
+    "R2_BUCKET_NAME": "hearts-data-cache"
+  }
+}

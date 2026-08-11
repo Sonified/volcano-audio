@@ -1,0 +1,11 @@
+{
+  "name": "volcano-collector-worker",
+  "private": true,
+  "description": "Cloudflare Worker + Container deployment for the seismic collector",
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.120.1"
+  }
+}

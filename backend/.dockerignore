@@ -1,0 +1,19 @@
+# Keep the container image lean — runtime only needs the root .py files,
+# requirements.txt, and stations_config.json
+cron_output/
+logs/
+archive/
+backend_docs/
+tests/
+utilities/
+scripts/
+__pycache__/
+*.pyc
+*.bak
+node_modules/
+cf/
+wrangler.jsonc
+package.json
+package-lock.json
+.deploy_time
+.DS_Store

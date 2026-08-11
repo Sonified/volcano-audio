@@ -35,3 +35,9 @@ final_analysis/video_creation/
 # Test files
 test_iris_speed.py
 js/test-iris-direct.js
+
+# Cloudflare Worker tooling (backend/)
+backend/node_modules/
+
+# Stray runtime log dumps
+logs.*.log
