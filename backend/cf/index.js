@@ -32,6 +32,27 @@ export class VolcanoCollector extends Container {
       SMTP_PASSWORD: env.SMTP_PASSWORD ?? "",
     };
   }
+
+  // Internal-only: the cron handler calls this after a collection run
+  // completes so the container stops IMMEDIATELY instead of waiting out
+  // sleepAfter (observed not reaping the instance between cron cycles —
+  // billing depends on this). Blocked from public traffic in the Worker.
+  async fetch(request) {
+    if (new URL(request.url).pathname === "/__stop") {
+      try {
+        // destroy(), not stop(): stop() sends SIGTERM, which a container
+        // image without a signal handler ignores (PID 1). destroy() is a
+        // hard kill — always works, and there's nothing in flight post-run.
+        await this.destroy();
+      } catch (e) {
+        console.log(`__stop: ${e.message}`);
+      }
+      return new Response(JSON.stringify({ stopped: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return super.fetch(request);
+  }
 }
 
 export default {
@@ -44,6 +65,11 @@ export default {
         JSON.stringify({ status: "ok", worker: "volcano-collector" }),
         { headers: { "Content-Type": "application/json" } }
       );
+    }
+
+    // Internal lifecycle route — never reachable from outside
+    if (url.pathname === "/__stop") {
+      return new Response("not found", { status: 404 });
     }
 
     // Everything else: wake the container (if asleep) and proxy through.
@@ -66,10 +92,14 @@ async function runScheduledCollection(env) {
   console.log(`cron: /trigger -> ${trigger.status}`);
 
   // /trigger returns immediately and runs collection in a background thread.
-  // Poll /collector-state so our requests keep the container awake until the
-  // run finishes (sleepAfter only counts from the last request).
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 15000));
+  // Poll /collector-state until the run finishes (fast at first — steady-state
+  // runs take ~5-10s — then slower for long backfill runs), then explicitly
+  // stop the container so we only pay for the seconds we actually use.
+  let elapsed = 0;
+  while (elapsed < 600) {
+    const step = elapsed < 60 ? 5 : 15;
+    await new Promise((r) => setTimeout(r, step * 1000));
+    elapsed += step;
     try {
       const resp = await container.fetch(
         new Request("http://collector/collector-state")
@@ -77,11 +107,14 @@ async function runScheduledCollection(env) {
       const state = await resp.json();
       if (!state.currently_running) {
         console.log(`cron: collection complete at ${state.last_run_completed}`);
+        await container.fetch(new Request("http://collector/__stop"));
+        console.log("cron: container stopped");
         return;
       }
     } catch (e) {
       console.log(`cron: poll error — ${e.message}`);
     }
   }
-  console.log("cron: run still going after 10 min; sleepAfter will reap it");
+  // Run still going after 10 min — do NOT kill it mid-run; sleepAfter reaps it.
+  console.log("cron: run still going after 10 min; leaving it to finish");
 }

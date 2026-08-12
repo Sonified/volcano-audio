@@ -6307,6 +6307,17 @@ def main():
     port = int(os.getenv('PORT', 5000))
     print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] Starting health API on port {port}")
 
+    # 🔥 FIX: This process runs as PID 1 in the Cloudflare container, and PID 1
+    # gets NO default signal dispositions — without a handler, SIGTERM is
+    # silently ignored and the container never stops (billed 24/7!). The
+    # Containers runtime signals SIGTERM both for sleepAfter expiry and for
+    # explicit stop() calls, so exit immediately when it arrives.
+    import signal
+    def _graceful_exit(signum, frame):
+        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] 🛑 SIGTERM received — container going to sleep")
+        os._exit(0)
+    signal.signal(signal.SIGTERM, _graceful_exit)
+
     # Cloudflare Containers mode: the Worker cron fires GET /trigger every
     # 10 minutes, so no internal scheduler — the container sleeps between
     # runs. Flask runs in the main thread instead.
