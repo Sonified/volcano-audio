@@ -8,9 +8,13 @@
 
   "observability": { "enabled": true },
 
-  // Same schedule the Railway internal scheduler ran: every 10 min at :02
+  // Hourly at :02 — each run collects the full previous hour as a 1h chunk,
+  // so coverage stays contiguous. The 6h auto-heal (00/06/12/18:02) and daily
+  // cleanup (00:02) both key off :02 runs and are unaffected. (Was every 10
+  // min on Railway; hourly keeps container usage fully inside the included
+  // Workers-plan allotments.)
   "triggers": {
-    "crons": ["2,12,22,32,42,52 * * * *"]
+    "crons": ["2 * * * *"]
   },
 
   "containers": [
